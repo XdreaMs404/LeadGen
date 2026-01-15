@@ -1,0 +1,150 @@
+# generated: 2026-01-13
+# project: LeadGen
+# project_key: leadgen
+# tracking_system: file-system
+# story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-13
+project: LeadGen
+project_key: leadgen
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # ============================================
+  # Epic 1: Foundation & Authentication
+  # ============================================
+  epic-1: in-progress
+  1-1-project-initialization-dev-environment: done
+  1-2-supabase-auth-with-google-oauth: done
+  1-3-workspace-creation-access: done
+  1-4-dashboard-layout-shell: done
+  1-5-logout-session-management: done
+  epic-1-retrospective: optional
+
+  # ============================================
+  # Epic 2: Deliverability Onboarding Gate
+  # ============================================
+  epic-2: in-progress
+  2-1-gmail-oauth-connection-with-send-read-scopes: done
+  2-2-dns-configuration-wizard-ui: review
+  2-3-dns-validation-service: review
+  2-4-onboarding-progress-status-tracking: ready-for-dev
+  2-5-sending-blocking-gate: ready-for-dev
+  epic-2-retrospective: optional
+
+  # ============================================
+  # Epic 3: Prospect Management & Enrichment
+  # ============================================
+  epic-3: backlog
+  3-1-icp-definition-storage: ready-for-dev
+  3-2-csv-import-with-source-tracking-validation: ready-for-dev
+  3-3-manual-prospect-creation: ready-for-dev
+  3-4-prospect-list-status-display-with-filters: ready-for-dev
+  3-5-dropcontact-enrichment-integration: ready-for-dev
+  3-6-prospect-deletion-with-cascade: ready-for-dev
+  epic-3-retrospective: optional
+
+  # ============================================
+  # Epic 4: Sequence Builder & Copilot Preview
+  # ============================================
+  epic-4: backlog
+  4-1-sequence-creation-max-3-steps: ready-for-dev
+  4-2-step-configuration-delays: ready-for-dev
+  4-3-template-variables-system-with-picker: ready-for-dev
+  4-4-llm-opener-personalization-mvp-safe: ready-for-dev
+  4-5-copilot-email-preview-mandatory: ready-for-dev
+  4-6-spam-risk-assessment-warnings-mvp-heuristics: ready-for-dev
+  4-7-sequence-templates-save-duplicate: ready-for-dev
+  epic-4-retrospective: optional
+
+  # ============================================
+  # Epic 5: Campaign Launch & Sending Engine
+  # ============================================
+  epic-5: backlog
+  5-1-campaign-entity-status-model: backlog
+  5-2-campaign-launch-wizard-with-pre-launch-gating: backlog
+  5-3-sending-settings-configuration: backlog
+  5-4-email-scheduling-queue-db-pillar-with-idempotency: backlog
+  5-5-gmail-api-email-sending-with-threading: backlog
+  5-6-campaign-control-pause-resume-stop-global: backlog
+  5-7-individual-lead-control-within-campaign: backlog
+  5-8-anomaly-detection-auto-pause-deliverability: backlog
+  epic-5-retrospective: optional
+
+  # ============================================
+  # Epic 6: Inbox & Response Management
+  # ============================================
+  epic-6: backlog
+  6-1-gmail-reply-sync-cron-polling-mvp: backlog
+  6-2-conversation-data-model: backlog
+  6-3-unified-inbox-ui: backlog
+  6-4-ai-reply-classification-with-confidence: backlog
+  6-5-manual-reply-reclassification: backlog
+  6-6-reply-suggestions-with-booking-link: backlog
+  6-7-send-reply-from-inbox-with-threading: backlog
+  epic-6-retrospective: optional
+
+  # ============================================
+  # Epic 7: Booking Integration & RDV Tracking
+  # ============================================
+  epic-7: backlog
+  7-1-booking-integration-setup-cal-com-calendly: backlog
+  7-2-booking-link-insertion-in-emails: backlog
+  7-3-webhook-endpoint-for-booking-confirmation: backlog
+  7-4-manual-booked-status-fallback: backlog
+  7-5-first-rdv-celebration: backlog
+  epic-7-retrospective: optional
+
+  # ============================================
+  # Epic 8: Guardrails & Compliance Core
+  # ============================================
+  epic-8: backlog
+  8-1-centralized-guardrails-service-no-send-without-verified: backlog
+  8-2-prospect-deduplication-no-duplicate-sends: backlog
+  8-3-sending-quota-enforcement: backlog
+  8-4-mandatory-unsubscribe-link: backlog
+  8-5-unsubscribe-detection-suppression-list: backlog
+  8-6-audit-logs: backlog
+  8-7-dsar-export-data-deletion: backlog
+  epic-8-retrospective: optional
+
+  # ============================================
+  # Epic 9: Dashboard & Analytics
+  # ============================================
+  epic-9: backlog
+  9-1-dashboard-stats-cards: backlog
+  9-2-health-score-calculation-display: backlog
+  9-3-reply-metrics-by-classification: backlog
+  9-4-rdv-metrics-display: backlog
+  9-5-header-health-score-badge-persistent: backlog
+  epic-9-retrospective: optional

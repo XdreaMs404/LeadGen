@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id // Uses Supabase Auth user ID
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspaces Workspace[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // DNS Status fields (Story 2.2)
+  spfStatus    DnsStatus @default(NOT_STARTED) @map("spf_status")
+  dkimStatus   DnsStatus @default(NOT_STARTED) @map("dkim_status")
+  dmarcStatus  DnsStatus @default(NOT_STARTED) @map("dmarc_status")
+  dkimSelector String?   @map("dkim_selector")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospects  Prospect[]
+  gmailToken GmailToken?
+
+  @@map("workspaces")
+  @@index([userId])
+}
+
+model Prospect {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  firstName   String?  @map("first_name")
+  lastName    String?  @map("last_name")
+  email       String
+  status      ProspectStatus @default(NEW)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("prospects")
+  @@index([workspaceId])
+  @@unique([workspaceId, email])
+}
+
+enum ProspectStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  BOUNCED
+  UNSUBSCRIBED
+  BOOKED
+
+  @@map("prospect_status")
+}
+
+enum DnsStatus {
+  NOT_STARTED
+  PASS
+  FAIL
+  UNKNOWN
+  MANUAL_OVERRIDE
+
+  @@map("dns_status")
+}
+
+model GmailToken {
+  id           String   @id @default(cuid())
+  workspaceId  String   @unique @map("workspace_id")
+  accessToken  String   @map("access_token")   // AES-256-GCM encrypted
+  refreshToken String   @map("refresh_token")  // AES-256-GCM encrypted
+  expiresAt    DateTime @map("expires_at")
+  email        String                          // Gmail email address
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("gmail_tokens")
+}
