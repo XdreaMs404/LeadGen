@@ -5,12 +5,16 @@ import { success, error } from '@/lib/utils/api-response';
 import { assertWorkspaceAccess, getWorkspaceId } from '@/lib/guardrails/workspace-check';
 import { mapSequenceStep } from '@/lib/prisma/mappers';
 import { z } from 'zod';
+import { ALLOWED_DELAY_DAYS } from '@/lib/constants/sequences';
 
-// Validation schema for updating a step
+// Validation schema for updating a step (Story 4.2 - AC2, Task 7)
 const UpdateStepSchema = z.object({
     subject: z.string().min(1).max(200).optional(),
     body: z.string().min(1).optional(),
-    delayDays: z.number().int().min(0).optional(),
+    delayDays: z.number().int().refine(
+        (val) => val === 0 || (ALLOWED_DELAY_DAYS as readonly number[]).includes(val),
+        { message: 'Valeur de délai invalide' }
+    ).optional(),
 });
 
 interface RouteParams {
@@ -58,7 +62,14 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
         const updateData: { subject?: string; body?: string; delayDays?: number } = {};
         if (parsed.data.subject) updateData.subject = parsed.data.subject.trim();
         if (parsed.data.body) updateData.body = parsed.data.body;
-        if (parsed.data.delayDays !== undefined) updateData.delayDays = parsed.data.delayDays;
+        if (parsed.data.delayDays !== undefined) {
+            // Story 4.2 - AC6: Step 1 must always have 0 delay
+            if (step.order === 1 && parsed.data.delayDays !== 0) {
+                updateData.delayDays = 0;
+            } else {
+                updateData.delayDays = parsed.data.delayDays;
+            }
+        }
 
         const updatedStep = await prisma.sequenceStep.update({
             where: { id: stepId },

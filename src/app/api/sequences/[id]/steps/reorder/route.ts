@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma/client';
 import { success, error } from '@/lib/utils/api-response';
 import { assertWorkspaceAccess, getWorkspaceId } from '@/lib/guardrails/workspace-check';
 import { z } from 'zod';
+import { DEFAULT_DELAY_DAYS } from '@/lib/constants/sequences';
 
 // Validation schema for reordering steps
 const ReorderStepsSchema = z.object({
@@ -17,8 +18,11 @@ interface RouteParams {
 /**
  * POST /api/sequences/[id]/steps/reorder - Reorder steps in a sequence
  * Story 4.1: Sequence Creation (Max 3 Steps) - AC7
+ * Story 4.2: Step Configuration & Delays - AC3
  * 
- * Accepts array of step IDs in desired order
+ * Accepts array of step IDs in desired order.
+ * Handles delay preservation: step moving to position 1 gets delay 0,
+ * step moving from position 1 gets DEFAULT_DELAY_DAYS.
  */
 export async function POST(req: NextRequest, { params }: RouteParams) {
     try {
@@ -64,8 +68,15 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             );
         }
 
+        // Build a map of old positions for delay logic
+        const oldPositionMap = new Map<string, number>();
+        for (const step of sequence.steps) {
+            oldPositionMap.set(step.id, step.order);
+        }
+
         // Update order for each step using transaction
         // Use temporary negative order values to avoid unique constraint conflicts
+        // Story 4.2 AC3: Handle delay preservation during reorder
         await prisma.$transaction(async (tx) => {
             // First, set all orders to negative (temporary)
             for (let i = 0; i < stepIds.length; i++) {
@@ -75,11 +86,31 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
                 });
             }
 
-            // Then set to positive final order
+            // Then set to positive final order and adjust delayDays
             for (let i = 0; i < stepIds.length; i++) {
+                const newOrder = i + 1;
+                const oldOrder = oldPositionMap.get(stepIds[i]) || 1;
+                const isFirstPosition = newOrder === 1;
+                const wasFirstPosition = oldOrder === 1;
+
+                // Determine delayDays update based on position changes
+                let delayDaysUpdate: number | undefined;
+
+                if (isFirstPosition) {
+                    // Step moving TO first position → delay must be 0
+                    delayDaysUpdate = 0;
+                } else if (wasFirstPosition && !isFirstPosition) {
+                    // Step moving FROM first position → set default delay
+                    delayDaysUpdate = DEFAULT_DELAY_DAYS;
+                }
+                // Otherwise, keep existing delay (delayDaysUpdate remains undefined)
+
                 await tx.sequenceStep.update({
                     where: { id: stepIds[i] },
-                    data: { order: i + 1 },
+                    data: {
+                        order: newOrder,
+                        ...(delayDaysUpdate !== undefined && { delayDays: delayDaysUpdate }),
+                    },
                 });
             }
         });
@@ -90,3 +121,4 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json(error('INTERNAL_ERROR', 'Erreur serveur'), { status: 500 });
     }
 }
+

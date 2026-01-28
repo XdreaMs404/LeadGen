@@ -2,25 +2,34 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Edit, Trash2, Mail } from 'lucide-react';
+import { GripVertical, Edit, Trash2, Mail, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import type { SequenceStep } from '@/types/sequence';
 import { cn } from '@/lib/utils';
+import { ALLOWED_DELAY_DAYS, DELAY_LABELS } from '@/lib/constants/sequences';
 
 interface StepCardProps {
     step: SequenceStep;
     stepNumber: number;
     onEdit: (step: SequenceStep) => void;
     onDelete: (step: SequenceStep) => void;
+    onDelayChange?: (step: SequenceStep, delayDays: number) => void;
 }
 
 /**
  * Sortable Step Card Component
- * Story 4.1 - Task 9
- * Displays step info with drag handle for reordering
+ * Story 4.1 - Task 9, Story 4.2 - Task 1
+ * Displays step info with drag handle for reordering and delay configuration
  */
-export function StepCard({ step, stepNumber, onEdit, onDelete }: StepCardProps) {
+export function StepCard({ step, stepNumber, onEdit, onDelete, onDelayChange }: StepCardProps) {
     const {
         attributes,
         listeners,
@@ -40,6 +49,12 @@ export function StepCard({ step, stepNumber, onEdit, onDelete }: StepCardProps) 
         .replace(/<[^>]*>/g, '')
         .slice(0, 100)
         .trim();
+
+    const handleDelayChange = (value: string) => {
+        if (onDelayChange) {
+            onDelayChange(step, Number(value));
+        }
+    };
 
     return (
         <Card
@@ -67,16 +82,11 @@ export function StepCard({ step, stepNumber, onEdit, onDelete }: StepCardProps) 
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-teal-600 dark:text-teal-400">
                                 Étape {stepNumber}
                             </span>
-                            {step.delayDays > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                    • +{step.delayDays} jour{step.delayDays > 1 ? 's' : ''}
-                                </span>
-                            )}
                         </div>
                         <h4 className="font-medium text-slate-900 dark:text-white truncate">
                             {step.subject || 'Sans objet'}
@@ -84,6 +94,30 @@ export function StepCard({ step, stepNumber, onEdit, onDelete }: StepCardProps) 
                         <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
                             {bodyPreview || 'Contenu vide...'}
                         </p>
+
+                        {/* Story 4.2 - AC1, AC2, AC6: Delay selector (only for steps after first) */}
+                        {step.order > 1 && (
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Attendre</span>
+                                <Select
+                                    value={String(step.delayDays)}
+                                    onValueChange={handleDelayChange}
+                                >
+                                    <SelectTrigger className="w-28 h-7 text-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {ALLOWED_DELAY_DAYS.map((days) => (
+                                            <SelectItem key={days} value={String(days)}>
+                                                {DELAY_LABELS[days]}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <span className="text-sm text-muted-foreground">avant l&apos;envoi</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions */}
@@ -110,3 +144,4 @@ export function StepCard({ step, stepNumber, onEdit, onDelete }: StepCardProps) 
         </Card>
     );
 }
+

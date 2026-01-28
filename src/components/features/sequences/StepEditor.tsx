@@ -1,14 +1,19 @@
 'use client';
 
-import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
-import { Bold, Italic, Link as LinkIcon } from 'lucide-react';
+import { Bold, Italic, Link as LinkIcon, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
+import { VariablePicker } from './VariablePicker';
+import { validateTemplateVariables } from '@/lib/template/variable-validator';
+import { renderTemplate } from '@/lib/template/render-variables';
+import { SAMPLE_PROSPECT } from '@/lib/template/sample-prospect';
 
 interface StepEditorProps {
     subject: string;
@@ -20,7 +25,7 @@ interface StepEditorProps {
 
 /**
  * Step Editor Component with Rich Text
- * Story 4.1 - Task 8
+ * Story 4.1 - Task 8, Story 4.3 - Variable picker, validation, preview
  * Uses Tiptap for rich text editing (bold, italic, links)
  */
 export function StepEditor({
@@ -32,6 +37,8 @@ export function StepEditor({
 }: StepEditorProps) {
     const [linkUrl, setLinkUrl] = useState('');
     const [showLinkInput, setShowLinkInput] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+    const [invalidVariables, setInvalidVariables] = useState<string[]>([]);
 
     const editor = useEditor({
         extensions: [
@@ -54,6 +61,28 @@ export function StepEditor({
             },
         },
     });
+
+    // Debounced validation for unknown variables
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const contentToValidate = `${subject} ${body}`;
+            const result = validateTemplateVariables(contentToValidate);
+            setInvalidVariables(result.invalidVariables);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [subject, body]);
+
+    // Render preview with sample prospect
+    const preview = useMemo(() => {
+        if (!showPreview) return null;
+        const subjectResult = renderTemplate(subject, SAMPLE_PROSPECT, { highlightMissing: true });
+        const bodyResult = renderTemplate(body, SAMPLE_PROSPECT, { highlightMissing: true });
+        return {
+            subject: subjectResult,
+            body: bodyResult,
+            hasMissing: subjectResult.missingFields.length > 0 || bodyResult.missingFields.length > 0,
+        };
+    }, [showPreview, subject, body]);
 
     const setLink = useCallback(() => {
         if (!editor || !linkUrl) return;
@@ -80,6 +109,17 @@ export function StepEditor({
         setLinkUrl('');
         setShowLinkInput(false);
     }, [editor, linkUrl]);
+
+    // Insert variable at cursor position
+    const handleInsertVariable = useCallback((variable: string) => {
+        if (!editor) return;
+
+        editor
+            .chain()
+            .focus()
+            .insertContent(variable)
+            .run();
+    }, [editor]);
 
     const wordCount = editor?.storage.characterCount?.words?.() ?? 0;
     const charCount = editor?.getText().length ?? 0;
@@ -176,14 +216,62 @@ export function StepEditor({
 
                         <div className="flex-1" />
 
-                        {/* Variable placeholder slot - future story 4.3 */}
-                        <div className="text-xs text-muted-foreground px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">
-                            Variables: bientôt disponible
-                        </div>
+                        {/* Variable Picker - Story 4.3 */}
+                        <VariablePicker onInsert={handleInsertVariable} />
+
+                        {/* Preview toggle - Story 4.3 */}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowPreview(!showPreview)}
+                            className={cn(
+                                showPreview && 'bg-slate-200 dark:bg-slate-700'
+                            )}
+                            title={showPreview ? 'Masquer aperçu' : 'Afficher aperçu'}
+                        >
+                            {showPreview ? (
+                                <EyeOff className="h-4 w-4" />
+                            ) : (
+                                <Eye className="h-4 w-4" />
+                            )}
+                            <span className="ml-1 text-xs">Aperçu</span>
+                        </Button>
                     </div>
 
-                    {/* Editor content */}
-                    <EditorContent editor={editor} />
+                    {/* Editor content or Preview */}
+                    {showPreview && preview ? (
+                        <div className="p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                <Eye className="h-3 w-3" />
+                                Aperçu avec données d&apos;exemple
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded-lg border p-4 space-y-3">
+                                <div>
+                                    <span className="text-xs text-muted-foreground">Objet:</span>
+                                    <div
+                                        className="font-medium"
+                                        dangerouslySetInnerHTML={{ __html: preview.subject.html }}
+                                    />
+                                </div>
+                                <hr />
+                                <div
+                                    className="prose prose-sm dark:prose-invert max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: preview.body.html }}
+                                />
+                            </div>
+                            {preview.hasMissing && (
+                                <Alert variant="default" className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                    <AlertDescription className="text-amber-800 dark:text-amber-200">
+                                        Certains champs sont vides pour les données d&apos;exemple. Les valeurs manquantes sont affichées en [vide].
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+                    ) : (
+                        <EditorContent editor={editor} />
+                    )}
 
                     {/* Character/word count */}
                     <div className="flex justify-end gap-4 px-4 py-2 border-t bg-slate-50 dark:bg-slate-900 text-xs text-muted-foreground">
@@ -192,6 +280,21 @@ export function StepEditor({
                     </div>
                 </div>
             </div>
+
+            {/* Unknown variable warnings - Story 4.3 */}
+            {invalidVariables.length > 0 && (
+                <Alert variant="default" className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800 dark:text-amber-200">
+                        {invalidVariables.map((v, i) => (
+                            <span key={v}>
+                                {i > 0 && ', '}
+                                ⚠️ Variable inconnue: <code className="font-mono bg-amber-100 dark:bg-amber-900/50 px-1 rounded">{v}</code>
+                            </span>
+                        ))}
+                    </AlertDescription>
+                </Alert>
+            )}
         </div>
     );
 }

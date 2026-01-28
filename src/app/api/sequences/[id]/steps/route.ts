@@ -6,13 +6,16 @@ import { assertWorkspaceAccess, getWorkspaceId } from '@/lib/guardrails/workspac
 import { mapSequenceStep } from '@/lib/prisma/mappers';
 import { z } from 'zod';
 
-import { MAX_STEPS_PER_SEQUENCE } from '@/lib/constants/sequences';
+import { MAX_STEPS_PER_SEQUENCE, ALLOWED_DELAY_DAYS, DEFAULT_DELAY_DAYS } from '@/lib/constants/sequences';
 
-// Validation schema for creating a step
+// Validation schema for creating a step (Story 4.2 - AC2, Task 2)
 const CreateStepSchema = z.object({
     subject: z.string().min(1, 'L\'objet est requis').max(200, 'L\'objet ne peut pas dépasser 200 caractères'),
     body: z.string().min(1, 'Le contenu est requis'),
-    delayDays: z.number().int().min(0).optional().default(0),
+    delayDays: z.number().int().refine(
+        (val) => val === 0 || (ALLOWED_DELAY_DAYS as readonly number[]).includes(val),
+        { message: 'Valeur de délai invalide' }
+    ).optional(),
 });
 
 interface RouteParams {
@@ -69,14 +72,19 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
         const { subject, body: stepBody, delayDays } = parsed.data;
 
+        // Story 4.2 - AC2, AC6: First step always has delay 0, subsequent steps default to DEFAULT_DELAY_DAYS
+        const newOrder = stepCount + 1;
+        const isFirstStep = newOrder === 1;
+        const finalDelayDays = delayDays ?? (isFirstStep ? 0 : DEFAULT_DELAY_DAYS);
+
         // Create step with next order number
         const step = await prisma.sequenceStep.create({
             data: {
                 sequenceId,
-                order: stepCount + 1,
+                order: newOrder,
                 subject: subject.trim(),
                 body: stepBody,
-                delayDays: delayDays ?? 0,
+                delayDays: finalDelayDays,
             },
         });
 

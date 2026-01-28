@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/tooltip';
 import { StepCard } from './StepCard';
 import { StepEditor } from './StepEditor';
+import { SequenceTimeline } from './SequenceTimeline';
 import {
     useSequence,
     useCreateSequence,
@@ -58,7 +59,7 @@ import {
 import type { Sequence, SequenceStep, CreateStepInput } from '@/types/sequence';
 import { toast } from 'sonner';
 
-import { MAX_STEPS_PER_SEQUENCE } from '@/lib/constants/sequences';
+import { MAX_STEPS_PER_SEQUENCE, DEFAULT_DELAY_DAYS } from '@/lib/constants/sequences';
 
 const MAX_STEPS = MAX_STEPS_PER_SEQUENCE;
 
@@ -128,11 +129,25 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
             const [removed] = newSteps.splice(oldIndex, 1);
             newSteps.splice(newIndex, 0, removed);
 
-            // Update order numbers
-            const updatedSteps = newSteps.map((step, idx) => ({
-                ...step,
-                order: idx + 1,
-            }));
+            // Update order numbers and delays (Story 4.2 - AC3 & AC6)
+            const updatedSteps = newSteps.map((step, idx) => {
+                const newOrder = idx + 1;
+                let delayDays = step.delayDays;
+
+                if (newOrder === 1) {
+                    // Moving TO first position -> reset to 0
+                    delayDays = 0;
+                } else if (step.order === 1 && newOrder > 1) {
+                    // Moving FROM first position -> set default
+                    delayDays = DEFAULT_DELAY_DAYS;
+                }
+
+                return {
+                    ...step,
+                    order: newOrder,
+                    delayDays,
+                };
+            });
 
             setLocalSteps(updatedSteps);
 
@@ -223,6 +238,23 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
         setStepBody(step.body);
         setEditorDialogOpen(true);
     }, []);
+
+    // Story 4.2 - AC2: Handle delay change from StepCard
+    const handleDelayChange = useCallback(async (step: SequenceStep, delayDays: number) => {
+        if (isEditMode && sequenceId && !step.id.startsWith('temp-')) {
+            // Persist to server
+            await updateStep.mutateAsync({
+                sequenceId,
+                stepId: step.id,
+                data: { delayDays },
+            });
+        } else {
+            // Update locally for create mode
+            setLocalSteps(prevSteps => prevSteps.map(s =>
+                s.id === step.id ? { ...s, delayDays } : s
+            ));
+        }
+    }, [isEditMode, sequenceId, updateStep]);
 
     // Delete step
     const handleDeleteClick = useCallback((step: SequenceStep) => {
@@ -397,28 +429,35 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
                                 <p className="text-sm">Cliquez sur &quot;Ajouter une étape&quot; pour commencer</p>
                             </div>
                         ) : (
-                            <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragEnd={handleDragEnd}
-                            >
-                                <SortableContext
-                                    items={localSteps.map(s => s.id)}
-                                    strategy={verticalListSortingStrategy}
+                            <>
+                                {/* Story 4.2 - AC5: Visual Timeline */}
+                                {localSteps.length > 1 && (
+                                    <SequenceTimeline steps={localSteps} className="mb-4" />
+                                )}
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
                                 >
-                                    <div className="space-y-3">
-                                        {localSteps.map((step, index) => (
-                                            <StepCard
-                                                key={step.id}
-                                                step={step}
-                                                stepNumber={index + 1}
-                                                onEdit={handleEditStep}
-                                                onDelete={handleDeleteClick}
-                                            />
-                                        ))}
-                                    </div>
-                                </SortableContext>
-                            </DndContext>
+                                    <SortableContext
+                                        items={localSteps.map(s => s.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-3">
+                                            {localSteps.map((step, index) => (
+                                                <StepCard
+                                                    key={step.id}
+                                                    step={step}
+                                                    stepNumber={index + 1}
+                                                    onEdit={handleEditStep}
+                                                    onDelete={handleDeleteClick}
+                                                    onDelayChange={handleDelayChange}
+                                                />
+                                            ))}
+                                        </div>
+                                    </SortableContext>
+                                </DndContext>
+                            </>
                         )}
                     </CardContent>
                 </Card>
