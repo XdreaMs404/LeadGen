@@ -71,6 +71,10 @@ export async function POST(request: NextRequest) {
             },
         });
 
+        // Check if override completes onboarding
+        const { checkAndUpdateOnboardingComplete } = await import('@/lib/onboarding/onboarding-service');
+        await checkAndUpdateOnboardingComplete(workspace.id);
+
         console.log(`[DNS Override] ${recordType.toUpperCase()} manually overridden for workspace: ${workspace.id}`);
 
         return NextResponse.json(success({

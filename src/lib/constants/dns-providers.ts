@@ -49,3 +49,6 @@ export const extractDomainFromEmail = (email: string): string | null => {
     const parts = email.split('@');
     return parts.length === 2 ? parts[1] : null;
 };
+
+// Personal Gmail domains that are auto-handled
+export const GMAIL_DOMAINS = ['gmail.com', 'googlemail.com'];

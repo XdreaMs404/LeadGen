@@ -1,6 +1,7 @@
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SessionManager } from '@/components/shared/SessionManager';
+import { OnboardingBannerWrapper } from '@/components/shared/OnboardingBannerWrapper';
 
 export default function DashboardLayout({
     children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
                 <Sidebar />
                 <div className="flex flex-1 flex-col overflow-hidden lg:ml-64">
                     <Header />
+                    <OnboardingBannerWrapper />
                     <main className="flex-1 overflow-y-auto p-6">
                         {children}
                     </main>
@@ -21,4 +23,3 @@ export default function DashboardLayout({
         </SessionManager>
     );
 }
-

@@ -37,33 +37,83 @@ model Workspace {
   dmarcStatus  DnsStatus @default(NOT_STARTED) @map("dmarc_status")
   dkimSelector String?   @map("dkim_selector")
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prospects  Prospect[]
-  gmailToken GmailToken?
+  // Onboarding status (Story 2.4)
+  onboardingComplete Boolean @default(false) @map("onboarding_complete")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospects      Prospect[]
+  gmailToken     GmailToken?
+  icpConfig      IcpConfig?
+  enrichmentJobs EnrichmentJob[]
+  sequences      Sequence[]
 
   @@map("workspaces")
   @@index([userId])
 }
 
+model IcpConfig {
+  id           String   @id @default(cuid())
+  workspaceId  String   @unique @map("workspace_id")
+  industries   String[] @default([])
+  companySizes String[] @map("company_sizes") @default([])
+  roles        String[] @default([])
+  locations    String[] @default([])
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("icp_configs")
+}
+
 model Prospect {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  firstName   String?  @map("first_name")
-  lastName    String?  @map("last_name")
-  email       String
-  status      ProspectStatus @default(NEW)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               String          @id @default(cuid())
+  workspaceId      String          @map("workspace_id")
+  email            String
+  firstName        String?         @map("first_name")
+  lastName         String?         @map("last_name")
+  company          String?
+  title            String?
+  phone            String?
+  linkedinUrl      String?         @map("linkedin_url")
+  source           ProspectSource  @default(OTHER)
+  sourceDetail     String?         @map("source_detail")
+  status           ProspectStatus  @default(NEW)
+  enrichmentSource String?         @map("enrichment_source")
+  enrichedAt       DateTime?       @map("enriched_at")
+  enrichmentData   Json?           @map("enrichment_data")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  deletedAt        DateTime?       @map("deleted_at")
+  deletedBy        String?         @map("deleted_by")
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  enrichmentJobs   EnrichmentJob[]
 
-  @@map("prospects")
-  @@index([workspaceId])
   @@unique([workspaceId, email])
+  @@index([workspaceId])
+  @@index([deletedAt])
+  @@map("prospects")
+}
+
+enum ProspectSource {
+  CRM_EXPORT
+  EVENT_CONFERENCE
+  NETWORK_REFERRAL
+  CONTENT_DOWNLOAD
+  OUTBOUND_RESEARCH
+  OTHER
+
+  @@map("prospect_source")
 }
 
 enum ProspectStatus {
   NEW
+  ENRICHING
+  VERIFIED
+  NOT_VERIFIED
+  NEEDS_REVIEW
+  SUPPRESSED
   CONTACTED
   REPLIED
   BOUNCED
@@ -97,3 +147,90 @@ model GmailToken {
 
   @@map("gmail_tokens")
 }
+
+model EnrichmentJob {
+  id          String              @id @default(cuid())
+  prospectId  String              @map("prospect_id")
+  workspaceId String              @map("workspace_id")
+  requestId   String?             @map("request_id")
+  status      EnrichmentJobStatus @default(PENDING)
+  attempts    Int                 @default(0)
+  lastError   String?             @map("last_error")
+  nextRetryAt DateTime?           @map("next_retry_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  completedAt DateTime?           @map("completed_at")
+
+  prospect  Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("enrichment_jobs")
+  @@index([workspaceId, status])
+  @@index([nextRetryAt, status])
+}
+
+enum EnrichmentJobStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("enrichment_job_status")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  userId      String   @map("user_id")
+  action      String   // PROSPECT_DELETED, CAMPAIGN_LAUNCHED, etc.
+  entityType  String   @map("entity_type") // PROSPECT, CAMPAIGN, etc.
+  entityId    String   @map("entity_id")
+  metadata    Json?    // Additional context (cascade summary, etc.)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+  @@index([workspaceId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+enum SequenceStatus {
+  DRAFT
+  READY
+  ARCHIVED
+
+  @@map("sequence_status")
+}
+
+model Sequence {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  name        String
+  status      SequenceStatus @default(DRAFT)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps     SequenceStep[]
+
+  @@map("sequences")
+  @@index([workspaceId])
+}
+
+model SequenceStep {
+  id         String   @id @default(cuid())
+  sequenceId String   @map("sequence_id")
+  order      Int      // 1, 2, 3
+  subject    String
+  body       String   @db.Text
+  delayDays  Int      @default(0) @map("delay_days") // Days after previous step
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@map("sequence_steps")
+  @@index([sequenceId])
+  @@unique([sequenceId, order])
+}
+

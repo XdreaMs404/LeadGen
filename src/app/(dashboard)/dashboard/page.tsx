@@ -13,6 +13,7 @@ import {
     CheckCircle2,
     Clock
 } from 'lucide-react'
+import { DashboardOnboardingSection } from '@/components/features/dashboard/DashboardOnboardingSection'
 
 export default async function DashboardPage() {
     const supabase = await createClient()
@@ -26,6 +27,9 @@ export default async function DashboardPage() {
 
     return (
         <div className="space-y-8">
+            {/* Onboarding Status Section */}
+            <DashboardOnboardingSection />
+
             {/* Welcome Header */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 p-8 text-white">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3" />

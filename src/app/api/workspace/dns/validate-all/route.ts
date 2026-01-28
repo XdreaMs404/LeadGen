@@ -98,6 +98,10 @@ export async function POST() {
             },
         });
 
+        // Trigger onboarding status check
+        const { checkAndUpdateOnboardingComplete } = await import('@/lib/onboarding/onboarding-service');
+        await checkAndUpdateOnboardingComplete(workspace.id);
+
         // Check if all passed for celebration
         const allPass = allRecordsPass(results);
 

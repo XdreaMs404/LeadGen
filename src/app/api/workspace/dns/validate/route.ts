@@ -123,6 +123,10 @@ export async function POST(request: NextRequest) {
             data: updateData,
         });
 
+        // Check if this validation completes onboarding
+        const { checkAndUpdateOnboardingComplete } = await import('@/lib/onboarding/onboarding-service');
+        await checkAndUpdateOnboardingComplete(workspace.id);
+
         console.log(`[DNS Validate] ${recordType.toUpperCase()} result: ${result.status}`);
 
         return NextResponse.json(success(result));

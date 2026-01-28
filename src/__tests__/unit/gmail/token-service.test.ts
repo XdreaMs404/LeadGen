@@ -17,7 +17,7 @@ vi.mock('@/lib/crypto/encrypt', () => ({
     decrypt: vi.fn((text: string) => text.replace('encrypted:', '')),
 }));
 
-import { getValidToken, getGmailConnectionStatus, revokeGmailToken } from '@/lib/gmail/token-service';
+import { getValidToken, getGmailConnectionStatus, revokeGmailToken, isTokenValid } from '@/lib/gmail/token-service';
 import { prisma } from '@/lib/prisma/client';
 
 describe('Gmail Token Service', () => {
@@ -193,6 +193,67 @@ describe('Gmail Token Service', () => {
 
             expect(result).toBe(true);
             expect(prisma.gmailToken.delete).toHaveBeenCalled();
+        });
+    });
+
+    describe('isTokenValid', () => {
+        it('should return true when token exists and is valid', async () => {
+            const futureDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+            vi.mocked(prisma.gmailToken.findUnique).mockResolvedValueOnce({
+                id: 'token-1',
+                workspaceId: 'workspace-123',
+                accessToken: 'encrypted:valid-access-token',
+                refreshToken: 'encrypted:refresh-token',
+                expiresAt: futureDate,
+                email: 'test@gmail.com',
+            } as never);
+
+            const result = await isTokenValid('workspace-123');
+
+            expect(result).toBe(true);
+        });
+
+        it('should return false when no token exists', async () => {
+            vi.mocked(prisma.gmailToken.findUnique).mockResolvedValueOnce(null);
+
+            const result = await isTokenValid('workspace-123');
+
+            expect(result).toBe(false);
+        });
+
+        it('should return false when token refresh fails', async () => {
+            // Token is expired
+            const pastDate = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+            vi.mocked(prisma.gmailToken.findUnique).mockResolvedValueOnce({
+                id: 'token-1',
+                workspaceId: 'workspace-123',
+                accessToken: 'encrypted:old-access-token',
+                refreshToken: 'encrypted:refresh-token',
+                expiresAt: pastDate,
+                email: 'test@gmail.com',
+            } as never);
+
+            // Mock failed refresh
+            const mockFetch = vi.fn().mockResolvedValue({
+                ok: false,
+                text: async () => 'invalid_grant',
+            });
+            global.fetch = mockFetch;
+
+            vi.useFakeTimers();
+
+            const promise = isTokenValid('workspace-123');
+
+            // Advance through backoff delays
+            await vi.advanceTimersByTimeAsync(100);
+            await vi.advanceTimersByTimeAsync(200);
+            await vi.advanceTimersByTimeAsync(400);
+
+            const result = await promise;
+
+            expect(result).toBe(false);
+
+            vi.useRealTimers();
         });
     });
 });

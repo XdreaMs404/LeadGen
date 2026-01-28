@@ -318,3 +318,8 @@ Gemini 2.5 Pro
   - **Fixed:** Integrated `GmailIntegration` into `SettingsTabs` and removed orphaned page reference in navigation (while keeping the page for direct access).
   - **Fixed:** Removed debug logs from OAuth API route.
   - **Note:** `gmail.modify` scope flagged as potentially over-privileged but kept per ACs.
+- 2026-01-15: Sr. Dev Code Review (Reviewer: AI)
+  - **Outcome:** Approved with Critical Fixes
+  - **Fixed:** Critical: Committed all unassigned implementation files.
+  - **Fixed:** Robustness: Added handling for `invalid_grant` token errors in `token-service.ts` to auto-cleanup revoked tokens.
+  - **Fixed:** API: Added `Content-Type` header to revoke API call.

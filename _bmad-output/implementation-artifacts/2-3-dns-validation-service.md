@@ -1,6 +1,6 @@
 # Story 2.3: DNS Validation Service
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

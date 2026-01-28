@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { DnsStatusResponse } from '@/types/dns';
 import type { ApiResponse } from '@/lib/utils/api-response';
+import { useWorkspace } from '@/hooks/use-workspace';
 
 async function fetchDnsStatus(): Promise<DnsStatusResponse> {
     const response = await fetch('/api/workspace/dns-status');
@@ -18,9 +19,12 @@ async function fetchDnsStatus(): Promise<DnsStatusResponse> {
  * Uses TanStack Query with auto-refetch on window focus
  */
 export function useDnsStatus() {
+    const { workspaceId, isLoading: isWorkspaceLoading } = useWorkspace();
+
     const query = useQuery({
-        queryKey: ['dns-status'],
+        queryKey: ['dns-status', workspaceId],
         queryFn: fetchDnsStatus,
+        enabled: !!workspaceId,
         refetchOnWindowFocus: true,
         staleTime: 30_000, // 30 seconds
     });
@@ -31,7 +35,7 @@ export function useDnsStatus() {
         dmarcStatus: query.data?.dmarcStatus ?? 'NOT_STARTED',
         dkimSelector: query.data?.dkimSelector ?? null,
         domain: query.data?.domain ?? null,
-        isLoading: query.isLoading,
+        isLoading: isWorkspaceLoading || query.isLoading,
         isError: query.isError,
         error: query.error,
         refetch: query.refetch,

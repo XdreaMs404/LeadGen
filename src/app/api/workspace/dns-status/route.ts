@@ -22,8 +22,10 @@ export async function GET() {
 
     try {
         // Get workspace with DNS status and Gmail token
+        // TODO: In Phase 2, extract workspaceId from 'x-workspace-id' header or similar context
         const workspace = await prisma.workspace.findFirst({
             where: { userId: user.id },
+            orderBy: { createdAt: 'asc' }, // Deterministic fallback for now
             select: {
                 id: true,
                 spfStatus: true,

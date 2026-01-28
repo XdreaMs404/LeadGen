@@ -156,14 +156,15 @@ describe('DNS Status API Integration', () => {
             const data = await response.json();
 
             // Verify prisma was called with correct user filter
-            expect(prisma.workspace.findFirst).toHaveBeenCalledWith({
+            expect(prisma.workspace.findFirst).toHaveBeenCalledWith(expect.objectContaining({
                 where: { userId: 'user-456' },
+                orderBy: { createdAt: 'asc' },
                 select: expect.objectContaining({
                     spfStatus: true,
                     dkimStatus: true,
                     dmarcStatus: true,
                 }),
-            });
+            }));
         });
     });
 });

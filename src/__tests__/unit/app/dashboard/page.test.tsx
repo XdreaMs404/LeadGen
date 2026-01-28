@@ -17,6 +17,11 @@ vi.mock('@/lib/supabase/server', () => ({
     })),
 }));
 
+// Mock the DashboardOnboardingSection since it's a client component with dependencies
+vi.mock('@/components/features/dashboard/DashboardOnboardingSection', () => ({
+    DashboardOnboardingSection: () => <div data-testid="mock-onboarding-section">Onboarding Section</div>,
+}));
+
 describe('DashboardPage', () => {
     it('redirects to login if user is not authenticated', async () => {
         // Mock getUser to return null user

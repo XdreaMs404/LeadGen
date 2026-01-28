@@ -153,6 +153,11 @@ export async function GET(request: NextRequest) {
             },
         });
 
+        // Trigger onboarding status check
+        // Import must be dynamic if not at top level, or imported at top
+        const { checkAndUpdateOnboardingComplete } = await import('@/lib/onboarding/onboarding-service');
+        await checkAndUpdateOnboardingComplete(workspace.id);
+
         // Redirect to original return path with success param
         const redirectUrl = new URL(`${appUrl}${returnTo}`);
         redirectUrl.searchParams.set('gmail_connected', 'true');

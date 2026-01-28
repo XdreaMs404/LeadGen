@@ -205,3 +205,30 @@ export async function revokeGmailToken(workspaceId: string): Promise<boolean> {
 
     return true;
 }
+
+/**
+ * Checks if a workspace has a valid Gmail token.
+ * 
+ * This function:
+ * 1. Checks if a token exists
+ * 2. Checks if token is expired
+ * 3. Attempts to refresh if expired
+ * 4. Returns false if refresh fails or token doesn't exist
+ * 
+ * @param workspaceId - The workspace ID to check
+ * @returns true if token is valid and usable, false otherwise
+ */
+export async function isTokenValid(workspaceId: string): Promise<boolean> {
+    try {
+        // This will validate token and refresh if needed
+        await getValidToken(workspaceId);
+        return true;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        // Log the reason for debugging
+        console.warn(`Token validation failed for workspace ${workspaceId}: ${message}`);
+
+        return false;
+    }
+}

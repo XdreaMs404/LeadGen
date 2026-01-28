@@ -56,35 +56,35 @@ development_status:
   # ============================================
   epic-2: in-progress
   2-1-gmail-oauth-connection-with-send-read-scopes: done
-  2-2-dns-configuration-wizard-ui: review
-  2-3-dns-validation-service: review
-  2-4-onboarding-progress-status-tracking: ready-for-dev
-  2-5-sending-blocking-gate: ready-for-dev
+  2-2-dns-configuration-wizard-ui: done
+  2-3-dns-validation-service: done
+  2-4-onboarding-progress-status-tracking: done
+  2-5-sending-blocking-gate: done
   epic-2-retrospective: optional
 
   # ============================================
   # Epic 3: Prospect Management & Enrichment
   # ============================================
-  epic-3: backlog
-  3-1-icp-definition-storage: ready-for-dev
-  3-2-csv-import-with-source-tracking-validation: ready-for-dev
-  3-3-manual-prospect-creation: ready-for-dev
-  3-4-prospect-list-status-display-with-filters: ready-for-dev
-  3-5-dropcontact-enrichment-integration: ready-for-dev
-  3-6-prospect-deletion-with-cascade: ready-for-dev
+  epic-3: in-progress
+  3-1-icp-definition-storage: done
+  3-2-csv-import-with-source-tracking-validation: done
+  3-3-manual-prospect-creation: done
+  3-4-prospect-list-status-display-with-filters: done
+  3-5-dropcontact-enrichment-integration: done
+  3-6-prospect-deletion-with-cascade: done
   epic-3-retrospective: optional
 
   # ============================================
   # Epic 4: Sequence Builder & Copilot Preview
   # ============================================
-  epic-4: backlog
-  4-1-sequence-creation-max-3-steps: ready-for-dev
-  4-2-step-configuration-delays: ready-for-dev
-  4-3-template-variables-system-with-picker: ready-for-dev
-  4-4-llm-opener-personalization-mvp-safe: ready-for-dev
-  4-5-copilot-email-preview-mandatory: ready-for-dev
-  4-6-spam-risk-assessment-warnings-mvp-heuristics: ready-for-dev
-  4-7-sequence-templates-save-duplicate: ready-for-dev
+  epic-4: in-progress
+  4-1-sequence-creation-max-3-steps: review
+  4-2-step-configuration-delays: backlog
+  4-3-template-variables-system-with-picker: backlog
+  4-4-llm-opener-personalization-mvp-safe: backlog
+  4-5-copilot-email-preview-mandatory: backlog
+  4-6-spam-risk-assessment-warnings-mvp-heuristics: backlog
+  4-7-sequence-templates-save-duplicate: backlog
   epic-4-retrospective: optional
 
   # ============================================

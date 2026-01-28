@@ -1,0 +1,10 @@
+email,first_name,last_name,company,title
+valid.one@test.com,Valid,One,Test Co,Manager
+invalid-email,Invalid,Email,No Domain,Staff
+duplicate@test.com,Duplicate,First,Dup Inc,Lead
+duplicate@test.com,Duplicate,Second,Dup Inc,Lead
+missing.email@domain,Missing,TLD,Broken,Worker
+,,Empty,Row,,
+valid.two@test.com,Valid,Two,Another Co,CEO
+"email_with_spaces @test.com",Space,In,Email,Staff
+"comma@test.com","Name, With Comma","Company, Ltd",Legal,Counsel

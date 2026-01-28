@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { GMAIL_DOMAINS } from '@/lib/constants/dns-providers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { WizardStepper, type WizardStep, type StepStatus } from '@/components/shared/WizardStepper';
@@ -97,7 +98,7 @@ export function DnsConfigStep({ onComplete }: DnsConfigStepProps) {
     }
 
     // Handle Personal Gmail addresses
-    const isPersonalGmail = domain === 'gmail.com' || domain === 'googlemail.com';
+    const isPersonalGmail = domain && GMAIL_DOMAINS.includes(domain);
 
     if (isPersonalGmail) {
         return (

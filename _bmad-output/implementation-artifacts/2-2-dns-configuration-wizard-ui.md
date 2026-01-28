@@ -1,6 +1,6 @@
 1# Story 2.2: DNS Configuration Wizard UI
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -301,16 +301,12 @@ Gemini 2.5 Pro
 - `src/lib/constants/dns-providers.ts`
 - `src/app/api/workspace/dns-status/route.ts`
 - `src/hooks/use-dns-status.ts`
-- `src/components/shared/WizardStepper.tsx`
-- `src/components/shared/DnsStatusBadge.tsx`
-- `src/components/features/onboarding/SpfStep.tsx`
-- `src/components/features/onboarding/DkimStep.tsx`
-- `src/components/features/onboarding/DmarcStep.tsx`
-- `src/components/features/onboarding/DnsConfigStep.tsx`
 - `src/__tests__/unit/dns/dns-providers.test.ts`
 - `src/__tests__/unit/dns/wizard-stepper.test.tsx`
 - `src/__tests__/unit/dns/dns-steps.test.tsx`
 - `src/__tests__/integration/dns-status.test.ts`
+- `src/hooks/use-workspace.ts`
+- `src/app/api/workspace/me/route.ts`
 
 **MODIFIED:**
 - `prisma/schema.prisma` - Added DnsStatus enum + Workspace DNS fields
