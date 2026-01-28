@@ -1,7 +1,8 @@
-import type { IcpConfig as PrismaIcpConfig, Prospect as PrismaProspect, Sequence as PrismaSequence, SequenceStep as PrismaSequenceStep } from '@prisma/client';
+import type { IcpConfig as PrismaIcpConfig, Prospect as PrismaProspect, Sequence as PrismaSequence, SequenceStep as PrismaSequenceStep, OpenerCache as PrismaOpenerCache } from '@prisma/client';
 import type { IcpConfig } from '@/types/icp';
 import type { Prospect } from '@/types/prospect';
 import type { Sequence, SequenceStep, SequenceListItem } from '@/types/sequence';
+import type { OpenerCacheData } from '@/types/opener';
 
 /**
  * Transform Prisma IcpConfig model to frontend-friendly JSON
@@ -89,5 +90,23 @@ export function mapSequenceListItem(prismaSequence: PrismaSequence & { _count?: 
         stepsCount: prismaSequence._count?.steps ?? 0,
         createdAt: prismaSequence.createdAt.toISOString(),
         updatedAt: prismaSequence.updatedAt.toISOString(),
+    };
+}
+
+/**
+ * Transform Prisma OpenerCache model to frontend-friendly JSON
+ */
+export function mapOpenerCache(prismaOpenerCache: PrismaOpenerCache, maxRegenerations: number = 3): OpenerCacheData {
+    return {
+        id: prismaOpenerCache.id,
+        workspaceId: prismaOpenerCache.workspaceId,
+        prospectId: prismaOpenerCache.prospectId,
+        sequenceId: prismaOpenerCache.sequenceId,
+        stepId: prismaOpenerCache.stepId,
+        openerText: prismaOpenerCache.openerText,
+        regenerationCount: prismaOpenerCache.regenerationCount,
+        regenerationsRemaining: maxRegenerations - prismaOpenerCache.regenerationCount,
+        createdAt: prismaOpenerCache.createdAt.toISOString(),
+        updatedAt: prismaOpenerCache.updatedAt.toISOString(),
     };
 }

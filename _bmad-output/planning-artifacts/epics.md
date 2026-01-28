@@ -997,45 +997,45 @@ So that **each recipient gets a customized message**.
 
 ---
 
-#### Story 4.4: LLM Opener Personalization (MVP Safe)
+#### Story 4.4: AI Email Assistant (Generate & Improve)
 
 As a **user**,
-I want **AI-generated personalized openers for my emails**,
-So that **each email feels custom-written without manual effort**.
+I want **AI-powered email generation and improvement**,
+So that **I can quickly create professional prospecting emails or enhance my existing content**.
 
 **Acceptance Criteria:**
 
-**Given** a user is editing an email step
-**When** they click "Generate opener with AI"
-**Then** the system generates a personalized opening line based on prospect data
-**And** only uses available data: first_name, company, title (no hallucinations)
-**And** generation completes in <3s (NFR2)
+**Given** a user is editing an email step (create OR edit mode)
+**When** they expand the "AI Assistant" panel below the editor
+**Then** they see two modes: "Rédiger un email" and "Améliorer ce texte"
 
-**Given** the LLM generates an opener
-**When** the result is displayed
-**Then** a clear disclaimer shows: "AI-generated. Review before sending."
-**And** the opener is inserted as editable text (not locked)
+**Given** a user selects "Rédiger un email"
+**When** they enter a prompt describing the email they want
+**Then** the AI generates a complete email (subject + body)
+**And** the user sees a preview before applying
+**And** the AI uses correct variable format: {{first_name}}, {{company}}, etc.
 
-**Given** a user wants a different opener
-**When** they click "Regenerate"
-**Then** a new opener is generated
-**And** regeneration is limited to 3 per prospect/sequence (quota)
-**And** a counter shows "2/3 regenerations remaining"
+**Given** a user selects "Améliorer ce texte"
+**When** they click "Améliorer"
+**Then** the AI reformulates their existing email to be more impactful
+**And** the user sees a preview before applying
+**And** existing variables are preserved
 
-**Given** an opener was already generated for this prospect/sequence
-**When** the user returns later
-**Then** the cached opener is shown (no re-generation)
-**And** "Regenerate" option is still available within quota
+**Given** the AI generates content
+**When** results are displayed
+**Then** a preview shows the generated subject + body
+**And** the user can "Appliquer" to replace current content
+**And** the user can "Annuler" to discard
 
-**Given** the LLM API times out
-**When** 30s passes without response
-**Then** a fallback message shows: "Could not generate. Write your own opener."
+**Given** the LLM API times out (30s)
+**When** generation fails
+**Then** an error message shows with retry option
 **And** the user can proceed manually
 
 **Technical Notes:**
-- Prompt engineering: "Use ONLY the following data: {prospect}. Do NOT invent facts."
-- Cache openers in DB: prospectId + sequenceId → opener
-- Rate limit LLM calls per workspace
+- AI panel below editor (not in toolbar) to avoid overflow
+- Expert B2B copywriting prompt with anti-hallucination rules
+- Variables in snake_case format: {{first_name}}, {{last_name}}, {{company}}, {{title}}, {{email}}
 
 ---
 

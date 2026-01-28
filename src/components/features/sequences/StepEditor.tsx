@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import { VariablePicker } from './VariablePicker';
+import { AIAssistantPanel } from './AIAssistantPanel';
 import { validateTemplateVariables } from '@/lib/template/variable-validator';
 import { renderTemplate } from '@/lib/template/render-variables';
 import { SAMPLE_PROSPECT } from '@/lib/template/sample-prospect';
@@ -26,7 +27,7 @@ interface StepEditorProps {
 /**
  * Step Editor Component with Rich Text
  * Story 4.1 - Task 8, Story 4.3 - Variable picker, validation, preview
- * Uses Tiptap for rich text editing (bold, italic, links)
+ * Story 4.4 - AI Email Assistant (generate & improve)
  */
 export function StepEditor({
     subject,
@@ -51,13 +52,13 @@ export function StepEditor({
             }),
         ],
         content: body,
-        immediatelyRender: false, // Fix SSR hydration mismatch
+        immediatelyRender: false,
         onUpdate: ({ editor }) => {
             onBodyChange(editor.getHTML());
         },
         editorProps: {
             attributes: {
-                class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] p-4',
+                class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[150px] p-4',
             },
         },
     });
@@ -87,17 +88,14 @@ export function StepEditor({
     const setLink = useCallback(() => {
         if (!editor || !linkUrl) return;
 
-        // Check if there's a selection
         const { from, to } = editor.state.selection;
         if (from === to) {
-            // No selection, insert the URL as text with link
             editor
                 .chain()
                 .focus()
                 .insertContent(`<a href="${linkUrl}">${linkUrl}</a>`)
                 .run();
         } else {
-            // Selection exists, wrap it in a link
             editor
                 .chain()
                 .focus()
@@ -113,15 +111,18 @@ export function StepEditor({
     // Insert variable at cursor position
     const handleInsertVariable = useCallback((variable: string) => {
         if (!editor) return;
-
-        editor
-            .chain()
-            .focus()
-            .insertContent(variable)
-            .run();
+        editor.chain().focus().insertContent(variable).run();
     }, [editor]);
 
-    const wordCount = editor?.storage.characterCount?.words?.() ?? 0;
+    // Handle AI generation result - replaces entire content
+    const handleAIResult = useCallback((newSubject: string, newBody: string) => {
+        onSubjectChange(newSubject);
+        onBodyChange(newBody);
+        if (editor) {
+            editor.commands.setContent(newBody);
+        }
+    }, [editor, onSubjectChange, onBodyChange]);
+
     const charCount = editor?.getText().length ?? 0;
 
     return (
@@ -146,7 +147,7 @@ export function StepEditor({
                     Contenu de l&apos;email
                 </Label>
                 <div className="border rounded-lg bg-white dark:bg-slate-800 overflow-hidden">
-                    {/* Toolbar */}
+                    {/* Toolbar - compact */}
                     <div className="flex items-center gap-1 p-2 border-b bg-slate-50 dark:bg-slate-900">
                         <Button
                             type="button"
@@ -216,10 +217,10 @@ export function StepEditor({
 
                         <div className="flex-1" />
 
-                        {/* Variable Picker - Story 4.3 */}
+                        {/* Variable Picker */}
                         <VariablePicker onInsert={handleInsertVariable} />
 
-                        {/* Preview toggle - Story 4.3 */}
+                        {/* Preview toggle */}
                         <Button
                             type="button"
                             variant="ghost"
@@ -264,7 +265,7 @@ export function StepEditor({
                                 <Alert variant="default" className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
                                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                                     <AlertDescription className="text-amber-800 dark:text-amber-200">
-                                        Certains champs sont vides pour les données d&apos;exemple. Les valeurs manquantes sont affichées en [vide].
+                                        Certains champs sont vides pour les données d&apos;exemple.
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -273,15 +274,14 @@ export function StepEditor({
                         <EditorContent editor={editor} />
                     )}
 
-                    {/* Character/word count */}
-                    <div className="flex justify-end gap-4 px-4 py-2 border-t bg-slate-50 dark:bg-slate-900 text-xs text-muted-foreground">
+                    {/* Character count */}
+                    <div className="flex justify-end px-4 py-2 border-t bg-slate-50 dark:bg-slate-900 text-xs text-muted-foreground">
                         <span>{charCount} caractères</span>
-                        <span>{wordCount} mots</span>
                     </div>
                 </div>
             </div>
 
-            {/* Unknown variable warnings - Story 4.3 */}
+            {/* Unknown variable warnings */}
             {invalidVariables.length > 0 && (
                 <Alert variant="default" className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -295,6 +295,13 @@ export function StepEditor({
                     </AlertDescription>
                 </Alert>
             )}
+
+            {/* AI Assistant Panel - Story 4.4 */}
+            <AIAssistantPanel
+                currentSubject={subject}
+                currentBody={body}
+                onApply={handleAIResult}
+            />
         </div>
     );
 }

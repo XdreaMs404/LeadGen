@@ -81,7 +81,7 @@ development_status:
   4-1-sequence-creation-max-3-steps: done
   4-2-step-configuration-delays: done
   4-3-template-variables-system-with-picker: done
-  4-4-llm-opener-personalization-mvp-safe: backlog
+  4-4-llm-opener-personalization-mvp-safe: review
   4-5-copilot-email-preview-mandatory: backlog
   4-6-spam-risk-assessment-warnings-mvp-heuristics: backlog
   4-7-sequence-templates-save-duplicate: backlog

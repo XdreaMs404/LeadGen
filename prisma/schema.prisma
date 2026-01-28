@@ -46,6 +46,7 @@ model Workspace {
   icpConfig      IcpConfig?
   enrichmentJobs EnrichmentJob[]
   sequences      Sequence[]
+  openerCaches   OpenerCache[]
 
   @@map("workspaces")
   @@index([userId])
@@ -89,6 +90,7 @@ model Prospect {
 
   workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   enrichmentJobs   EnrichmentJob[]
+  openerCaches     OpenerCache[]
 
   @@unique([workspaceId, email])
   @@index([workspaceId])
@@ -210,8 +212,9 @@ model Sequence {
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
-  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  steps     SequenceStep[]
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps        SequenceStep[]
+  openerCaches OpenerCache[]
 
   @@map("sequences")
   @@index([workspaceId])
@@ -227,10 +230,33 @@ model SequenceStep {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  sequence     Sequence      @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  openerCaches OpenerCache[]
 
   @@map("sequence_steps")
   @@index([sequenceId])
   @@unique([sequenceId, order])
 }
 
+model OpenerCache {
+  id                String   @id @default(cuid())
+  workspaceId       String   @map("workspace_id")
+  prospectId        String   @map("prospect_id")
+  sequenceId        String   @map("sequence_id")
+  stepId            String   @map("step_id")
+  openerText        String   @map("opener_text") @db.Text
+  regenerationCount Int      @default(0) @map("regeneration_count")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  prospect  Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  sequence  Sequence     @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  step      SequenceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, prospectId, sequenceId, stepId])
+  @@map("opener_cache")
+  @@index([workspaceId])
+  @@index([prospectId])
+  @@index([sequenceId])
+}
