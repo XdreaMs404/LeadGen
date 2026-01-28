@@ -78,7 +78,7 @@ development_status:
   # Epic 4: Sequence Builder & Copilot Preview
   # ============================================
   epic-4: in-progress
-  4-1-sequence-creation-max-3-steps: review
+  4-1-sequence-creation-max-3-steps: done
   4-2-step-configuration-delays: backlog
   4-3-template-variables-system-with-picker: backlog
   4-4-llm-opener-personalization-mvp-safe: backlog
