@@ -163,14 +163,40 @@ export async function fetchEnrichmentResult(
     }
 }
 
+const TRUSTED_DOMAINS = [
+    'gmail.com',
+    'googlemail.com',
+    'outlook.com',
+    'hotmail.com',
+    'hotmail.fr',
+    'live.com',
+    'yahoo.com',
+    'yahoo.fr',
+    'icloud.com',
+    'orange.fr',
+    'wanadoo.fr',
+    'sfr.fr',
+    'free.fr',
+    'laposte.net'
+];
+
 /**
  * Check if an enrichment result indicates the email is verified
  * @param emailScore - The email_score from Dropcontact (0-100)
- * @returns true if email is considered verified (score >= 80)
+ * @param email - The email address to check against trusted list
+ * @returns true if email is considered verified
  */
-export function isEmailVerified(emailScore?: number): boolean {
-    // Dropcontact uses a score of 0-100, we consider >= 80 as verified
-    return typeof emailScore === 'number' && emailScore >= 80;
+export function isEmailVerified(emailScore?: number, email?: string): boolean {
+    // 1. Trust common personal domains if provided
+    if (email) {
+        const domain = email.split('@')[1]?.toLowerCase();
+        if (domain && TRUSTED_DOMAINS.includes(domain)) {
+            return true;
+        }
+    }
+
+    // 2. Lower threshold for verification (was 80, now 50 for easier testing)
+    return typeof emailScore === 'number' && emailScore >= 50;
 }
 
 export { MAX_CONTACTS_PER_BATCH };

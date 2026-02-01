@@ -121,14 +121,14 @@ export function OnboardingProgressCard({
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: index * 0.1 }}
                                     className={`flex items-center justify-between p-3 rounded-xl transition-all ${step.done
-                                            ? 'bg-teal-500/10 border border-teal-500/20'
-                                            : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                                        ? 'bg-teal-500/10 border border-teal-500/20'
+                                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${step.done
-                                                ? 'bg-teal-500/20 text-teal-400'
-                                                : 'bg-slate-700/50 text-slate-400'
+                                            ? 'bg-teal-500/20 text-teal-400'
+                                            : 'bg-slate-700/50 text-slate-400'
                                             }`}>
                                             <Icon className="h-4 w-4" />
                                         </div>
@@ -172,7 +172,7 @@ export function OnboardingProgressCard({
                         asChild
                         className="w-full h-12 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-semibold shadow-lg shadow-teal-500/25 border-0 transition-all hover:shadow-xl hover:shadow-teal-500/30"
                     >
-                        <Link href="/settings/onboarding" className="flex items-center justify-center gap-2">
+                        <Link href="/onboarding" className="flex items-center justify-center gap-2">
                             Continuer la configuration
                             <ArrowRight className="h-4 w-4" />
                         </Link>

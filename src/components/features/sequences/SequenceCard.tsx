@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { MoreHorizontal, Layers, Calendar, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Layers, Calendar, Edit, Trash2, Copy, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SequenceStatusBadge } from './SequenceStatusBadge';
@@ -16,14 +17,17 @@ import type { SequenceListItem } from '@/types/sequence';
 interface SequenceCardProps {
     sequence: SequenceListItem;
     onDelete: (sequence: SequenceListItem) => void;
+    onDuplicate?: (sequence: SequenceListItem) => void; // Story 4.7
+    onSaveAsTemplate?: (sequence: SequenceListItem) => void; // Story 4.7
 }
 
 /**
  * Sequence Card Component
  * Story 4.1 - Task 6
+ * Updated Story 4.7 - Added Duplicate and Save as Template actions
  * Displays sequence info in a card with actions
  */
-export function SequenceCard({ sequence, onDelete }: SequenceCardProps) {
+export function SequenceCard({ sequence, onDelete, onDuplicate, onSaveAsTemplate }: SequenceCardProps) {
     const formattedDate = new Date(sequence.createdAt).toLocaleDateString('fr-FR', {
         day: 'numeric',
         month: 'short',
@@ -79,6 +83,23 @@ export function SequenceCard({ sequence, onDelete }: SequenceCardProps) {
                                         Modifier
                                     </Link>
                                 </DropdownMenuItem>
+                                {onDuplicate && (
+                                    <DropdownMenuItem
+                                        onClick={() => onDuplicate(sequence)}
+                                    >
+                                        <Copy className="h-4 w-4 mr-2" />
+                                        Dupliquer
+                                    </DropdownMenuItem>
+                                )}
+                                {onSaveAsTemplate && (
+                                    <DropdownMenuItem
+                                        onClick={() => onSaveAsTemplate(sequence)}
+                                    >
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Enregistrer comme modèle
+                                    </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                     className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20"
                                     onClick={() => onDelete(sequence)}
@@ -94,3 +115,4 @@ export function SequenceCard({ sequence, onDelete }: SequenceCardProps) {
         </Card>
     );
 }
+

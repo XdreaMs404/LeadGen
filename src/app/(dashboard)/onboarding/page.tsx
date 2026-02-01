@@ -1,15 +1,15 @@
-import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma/client';
 import { OnboardingWizard } from '@/components/features/onboarding/OnboardingWizard';
+import { Sparkles } from 'lucide-react';
 
 export const metadata = {
-    title: 'Onboarding | LeadGen',
-    description: 'Set up your LeadGen account',
+    title: 'Configuration — LeadGen',
+    description: 'Configurez votre compte pour commencer à envoyer des campagnes',
 };
 
-async function getOnboardingData() {
+export default async function OnboardingPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -23,42 +23,29 @@ async function getOnboardingData() {
     });
 
     if (!workspace) {
-        redirect('/');
+        return <div>Erreur : Espace de travail introuvable</div>;
     }
 
-    return {
-        gmailConnected: !!workspace.gmailToken,
-        gmailEmail: workspace.gmailToken?.email,
-    };
-}
-
-export default async function OnboardingPage() {
-    const { gmailConnected, gmailEmail } = await getOnboardingData();
-
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-            <div className="container mx-auto py-12 px-4">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold mb-2">Welcome to LeadGen</h1>
-                    <p className="text-muted-foreground">
-                        Let&apos;s get your account set up so you can start sending campaigns.
-                    </p>
+        <div className="max-w-4xl mx-auto space-y-8 py-8">
+            {/* Header */}
+            <div className="text-center space-y-4 mb-12">
+                <div className="inline-flex items-center justify-center p-3 bg-gradient-to-br from-teal-500/10 to-emerald-500/10 rounded-2xl ring-1 ring-teal-500/20 mb-4">
+                    <Sparkles className="h-8 w-8 text-teal-600" />
                 </div>
-                <Suspense fallback={<OnboardingLoading />}>
-                    <OnboardingWizard
-                        gmailConnected={gmailConnected}
-                        gmailEmail={gmailEmail}
-                    />
-                </Suspense>
+                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700">
+                    Configuration de votre compte
+                </h1>
+                <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+                    Suivez ces étapes pour connecter votre boîte mail et assurer une délivrabilité optimale pour vos campagnes.
+                </p>
             </div>
-        </div>
-    );
-}
 
-function OnboardingLoading() {
-    return (
-        <div className="flex items-center justify-center py-12">
-            <div className="animate-pulse text-muted-foreground">Loading...</div>
+            {/* Wizard */}
+            <OnboardingWizard
+                gmailConnected={!!workspace.gmailToken}
+                gmailEmail={workspace.gmailToken?.email}
+            />
         </div>
     );
 }

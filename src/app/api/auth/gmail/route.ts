@@ -34,7 +34,13 @@ export async function GET(request: NextRequest) {
 
         // Validate required environment variables
         const clientId = process.env.GMAIL_CLIENT_ID;
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+        let appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+        // In development, force localhost to match Google Console allowed redirect URIs
+        // This handles cases where user uses ngrok for webhooks but needs localhost for Google Auth
+        if (process.env.NODE_ENV === 'development') {
+            appUrl = 'http://localhost:3000';
+        }
 
         if (!clientId || !appUrl) {
             console.error('Missing Gmail OAuth configuration');

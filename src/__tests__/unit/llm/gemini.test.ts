@@ -5,32 +5,36 @@
  * Tests for email generation and improvement logic
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { geminiProvider } from '@/lib/llm/gemini';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { LLMError } from '@/lib/llm/types';
 
-// Mock the Vertex AI client
-const mockGenerateContent = vi.fn();
+// Create a hoisted mock function that can be referenced across tests
+const mockGenerateContent = vi.hoisted(() => vi.fn());
 
-// Use a class for the mock to ensure 'new VertexAI()' works correctly
-const MockVertexAI = class {
-    constructor(options: any) { }
-    getGenerativeModel() {
-        return {
-            generateContent: mockGenerateContent
-        };
-    }
-};
-
+// Mock must be defined with inline class to avoid hoisting issues
 vi.mock('@google-cloud/vertexai', () => ({
-    VertexAI: MockVertexAI
+    VertexAI: class {
+        constructor(_options: unknown) { }
+        getGenerativeModel() {
+            return {
+                generateContent: mockGenerateContent
+            };
+        }
+    }
 }));
 
+// Import after mock setup - creates a new instance
+import { geminiProvider } from '@/lib/llm/gemini';
+
 describe('GeminiProvider', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        // Reset process.env for credentials check
+    beforeAll(() => {
+        // Ensure credentials are set for all tests
         process.env.GOOGLE_APPLICATION_CREDENTIALS = './credentials/vertex-ai-service-account.json';
+    });
+
+    beforeEach(() => {
+        // Reset mock before each test
+        mockGenerateContent.mockReset();
     });
 
     describe('generateEmail', () => {
@@ -66,7 +70,7 @@ describe('GeminiProvider', () => {
                     candidates: [{
                         content: {
                             parts: [{
-                                text: '```json\n{"subject": "Test", "body": "Body"}\n```'
+                                text: '```json\n{"subject": "Test", "body": "<p>Body</p>"}\n```'
                             }]
                         }
                     }]
@@ -76,7 +80,7 @@ describe('GeminiProvider', () => {
             const result = await geminiProvider.generateEmail('prompt');
             expect(result).toEqual({
                 subject: 'Test',
-                body: 'Body'
+                body: '<p>Body</p>'
             });
         });
 
@@ -126,7 +130,7 @@ describe('GeminiProvider', () => {
                             parts: [{
                                 text: JSON.stringify({
                                     subject: 'Improved Subject',
-                                    body: 'Improved Body'
+                                    body: '<p>Improved Body</p>'
                                 })
                             }]
                         }
@@ -146,21 +150,23 @@ describe('GeminiProvider', () => {
                 response: {
                     candidates: [{
                         content: {
-                            parts: [{ text: '{}' }]
+                            parts: [{
+                                text: JSON.stringify({
+                                    subject: 'Subject',
+                                    body: '<p>Result</p>'
+                                })
+                            }]
                         }
                     }]
                 }
-            }).mockRejectedValue(new Error('Ignore this'));
+            });
 
-            try {
-                await geminiProvider.improveEmail('Subject', '<p>Paragraph</p>');
-            } catch (e) {
-                // Ignore parsing error for this test, we check the prompt
-            }
+            await geminiProvider.improveEmail('Subject', '<p>Paragraph</p>');
 
             const callArg = mockGenerateContent.mock.calls[0][0];
-            expect(callArg).not.toContain('<p>');
-            expect(callArg).toContain('Paragraph');
+            // Input body should be stripped - check the Corps section
+            // The call should contain "Paragraph" without the HTML tags around it
+            expect(callArg).toContain('Corps:\nParagraph');
         });
     });
 });

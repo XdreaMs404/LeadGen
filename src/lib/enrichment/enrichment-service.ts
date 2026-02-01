@@ -239,7 +239,8 @@ export async function pollJobResult(
         }
 
         // Determine new status based on email verification
-        const emailVerified = isEmailVerified(enrichedContact.email_score);
+        // Pass job.prospect.email to allow trusted domain check
+        const emailVerified = isEmailVerified(enrichedContact.email_score, job.prospect.email);
         const newStatus: ProspectStatus = emailVerified ? 'VERIFIED' : 'NOT_VERIFIED';
 
         // Prepare enrichment data

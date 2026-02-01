@@ -161,7 +161,9 @@ export function useDeleteSequence() {
         onSuccess: () => {
             toast.success('Séquence supprimée');
             if (workspaceId) {
+                // Invalidate both sequences and templates (since templates are sequences with isTemplate=true)
                 queryClient.invalidateQueries({ queryKey: ['sequences', workspaceId] });
+                queryClient.invalidateQueries({ queryKey: ['templates', workspaceId] });
             }
         },
         onError: (error: Error) => {
@@ -169,6 +171,7 @@ export function useDeleteSequence() {
         },
     });
 }
+
 
 // ===== useAddStep Mutation Hook (Story 4.1 - AC2, AC3) =====
 
@@ -315,6 +318,190 @@ export function useReorderSteps() {
         },
         onError: (error: Error) => {
             toast.error(error.message || 'Erreur lors du réordonnancement');
+        },
+    });
+}
+
+// ===== useApproveSequence Mutation Hook (Story 4.5 - AC4) =====
+
+/**
+ * Hook for approving a sequence (set status to READY)
+ * Uses PATCH endpoint which validates that sequence has at least one step
+ */
+export function useApproveSequence() {
+    const queryClient = useQueryClient();
+    const { workspaceId } = useWorkspace();
+
+    return useMutation({
+        mutationFn: async (sequenceId: string): Promise<Sequence> => {
+            const res = await fetch(`/api/sequences/${sequenceId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'READY' }),
+            });
+
+            const json: ApiResponse<Sequence> = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error.message);
+            }
+
+            return json.data;
+        },
+        onSuccess: (sequence) => {
+            toast.success('Séquence approuvée et prête à l\'envoi');
+            if (workspaceId) {
+                queryClient.invalidateQueries({ queryKey: ['sequences', workspaceId] });
+                queryClient.invalidateQueries({ queryKey: ['sequences', workspaceId, sequence.id] });
+            }
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || 'Erreur lors de l\'approbation');
+        },
+    });
+}
+
+// ===== useDuplicateSequence Mutation Hook (Story 4.7 - AC3, AC4) =====
+
+/**
+ * Hook for duplicating a sequence
+ */
+export function useDuplicateSequence() {
+    const queryClient = useQueryClient();
+    const { workspaceId } = useWorkspace();
+
+    return useMutation({
+        mutationFn: async (sequenceId: string): Promise<Sequence> => {
+            const res = await fetch(`/api/sequences/${sequenceId}/duplicate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            const json: ApiResponse<Sequence> = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error.message);
+            }
+
+            return json.data;
+        },
+        onSuccess: (sequence) => {
+            toast.success('Séquence dupliquée');
+            if (workspaceId) {
+                queryClient.invalidateQueries({ queryKey: ['sequences', workspaceId] });
+            }
+            return sequence;
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || 'Erreur lors de la duplication');
+        },
+    });
+}
+
+// ===== useSaveAsTemplate Mutation Hook (Story 4.7 - AC1) =====
+
+/**
+ * Hook for saving a sequence as a template
+ */
+export function useSaveAsTemplate() {
+    const queryClient = useQueryClient();
+    const { workspaceId } = useWorkspace();
+
+    return useMutation({
+        mutationFn: async ({ sequenceId, name, description }: {
+            sequenceId: string;
+            name?: string;
+            description?: string;
+        }): Promise<Sequence> => {
+            const res = await fetch(`/api/sequences/${sequenceId}/save-as-template`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description }),
+            });
+
+            const json: ApiResponse<Sequence> = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error.message);
+            }
+
+            return json.data;
+        },
+        onSuccess: () => {
+            toast.success('Modèle enregistré');
+            if (workspaceId) {
+                queryClient.invalidateQueries({ queryKey: ['templates', workspaceId] });
+            }
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || 'Erreur lors de l\'enregistrement du modèle');
+        },
+    });
+}
+
+// ===== useTemplates Query Hook (Story 4.7 - AC2) =====
+
+interface TemplatesResponse {
+    templates: SequenceListItem[];
+}
+
+/**
+ * Hook for fetching all templates for the current workspace
+ */
+export function useTemplates() {
+    const { workspaceId } = useWorkspace();
+
+    return useQuery({
+        queryKey: ['templates', workspaceId] as const,
+        queryFn: async (): Promise<TemplatesResponse> => {
+            const res = await fetch('/api/templates');
+            const json: ApiResponse<TemplatesResponse> = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error.message);
+            }
+
+            return json.data;
+        },
+        placeholderData: keepPreviousData,
+        enabled: !!workspaceId,
+    });
+}
+
+// ===== useCreateFromTemplate Mutation Hook (Story 4.7 - AC2) =====
+
+/**
+ * Hook for creating a sequence from a template
+ */
+export function useCreateFromTemplate() {
+    const queryClient = useQueryClient();
+    const { workspaceId } = useWorkspace();
+
+    return useMutation({
+        mutationFn: async ({ templateId, name }: { templateId: string; name?: string }): Promise<Sequence> => {
+            const res = await fetch(`/api/templates/${templateId}/create-sequence`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name }),
+            });
+
+            const json: ApiResponse<Sequence> = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error.message);
+            }
+
+            return json.data;
+        },
+        onSuccess: (sequence) => {
+            toast.success('Séquence créée depuis le modèle');
+            if (workspaceId) {
+                queryClient.invalidateQueries({ queryKey: ['sequences', workspaceId] });
+            }
+            return sequence;
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || 'Erreur lors de la création depuis le modèle');
         },
     });
 }

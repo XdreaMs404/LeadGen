@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GmailConnectStep } from './GmailConnectStep';
 import { DnsConfigStep } from './DnsConfigStep';
+import { GMAIL_DOMAINS } from '@/lib/constants/dns-providers';
 
 interface OnboardingWizardProps {
     gmailConnected: boolean;
@@ -15,10 +16,16 @@ type OnboardingStep = 'gmail' | 'dns' | 'complete';
 export function OnboardingWizard({ gmailConnected, gmailEmail }: OnboardingWizardProps) {
     const router = useRouter();
 
+    // Check if user has a personal Gmail account (DNS is auto-managed by Google)
+    const isPersonalGmail = gmailEmail
+        ? GMAIL_DOMAINS.includes(gmailEmail.split('@')[1]?.toLowerCase() ?? '')
+        : false;
+
     // Determine initial step based on completion status
     const getInitialStep = (): OnboardingStep => {
         if (!gmailConnected) return 'gmail';
-        return 'dns'; // Navigate to DNS step when Gmail is connected
+        // For personal Gmail, DNS is auto-complete, go directly to DNS step (which shows success)
+        return 'dns';
     };
 
     const [currentStep, setCurrentStep] = useState<OnboardingStep>(getInitialStep());
@@ -36,14 +43,27 @@ export function OnboardingWizard({ gmailConnected, gmailEmail }: OnboardingWizar
 
     const handleDnsComplete = () => {
         // Redirect to dashboard after DNS configuration is complete
-        router.push('/');
+        router.push('/dashboard');
     };
+
+    // For personal Gmail accounts, DNS step is already complete
+    const dnsStepCompleted = isPersonalGmail;
 
     const steps = [
         { id: 'gmail', label: 'Connecter Gmail', completed: gmailConnected },
-        { id: 'dns', label: 'Configurer DNS', completed: false },
+        { id: 'dns', label: 'Configurer DNS', completed: dnsStepCompleted },
         { id: 'complete', label: 'Prêt !', completed: false },
     ];
+
+    // Determine which step to highlight as active
+    const getActiveStep = (): OnboardingStep => {
+        if (!gmailConnected) return 'gmail';
+        // For personal Gmail with DNS auto-complete, show "Prêt !" as active since they're done
+        if (isPersonalGmail) return 'complete';
+        return 'dns';
+    };
+
+    const activeStep = getActiveStep();
 
     return (
         <div className="space-y-8">
@@ -54,14 +74,14 @@ export function OnboardingWizard({ gmailConnected, gmailEmail }: OnboardingWizar
                         <div
                             className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium
                                 ${step.completed ? 'bg-primary text-primary-foreground' :
-                                    currentStep === step.id ? 'bg-primary text-primary-foreground' :
+                                    activeStep === step.id ? 'bg-primary text-primary-foreground' :
                                         'bg-muted text-muted-foreground'}
                             `}
                         >
                             {step.completed ? '✓' : index + 1}
                         </div>
                         <span className={`ml-2 text-sm hidden sm:inline
-                            ${currentStep === step.id ? 'font-medium' : 'text-muted-foreground'}
+                            ${activeStep === step.id ? 'font-medium' : 'text-muted-foreground'}
                         `}>
                             {step.label}
                         </span>

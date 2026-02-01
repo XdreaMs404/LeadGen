@@ -1,6 +1,6 @@
 # Story 4.4: AI Email Assistant (Generate & Improve)
 
-Status: review
+Status: done
 
 ## Story
 

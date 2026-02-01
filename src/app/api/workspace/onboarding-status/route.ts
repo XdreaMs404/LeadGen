@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma/client';
 import { success, error } from '@/lib/utils/api-response';
 import { calculateProgress, isOnboardingComplete } from '@/lib/onboarding/onboarding-service';
+import { GMAIL_DOMAINS, extractDomainFromEmail } from '@/lib/constants/dns-providers';
 
 export interface OnboardingStatusResponse {
     gmailConnected: boolean;
@@ -35,15 +36,20 @@ export async function GET() {
 
         const gmailConnected = workspace.gmailToken !== null;
         const gmailEmail = workspace.gmailToken?.email ?? null;
+
+        // Personal Gmail accounts have DNS managed by Google automatically
+        const domain = gmailEmail ? extractDomainFromEmail(gmailEmail) : null;
+        const isPersonalGmail = domain && GMAIL_DOMAINS.includes(domain);
+
         const progressPercent = calculateProgress(workspace);
         const onboardingComplete = isOnboardingComplete(workspace);
 
         const response: OnboardingStatusResponse = {
             gmailConnected,
             gmailEmail,
-            spfStatus: workspace.spfStatus,
-            dkimStatus: workspace.dkimStatus,
-            dmarcStatus: workspace.dmarcStatus,
+            spfStatus: isPersonalGmail ? 'PASS' : workspace.spfStatus,
+            dkimStatus: isPersonalGmail ? 'PASS' : workspace.dkimStatus,
+            dmarcStatus: isPersonalGmail ? 'PASS' : workspace.dmarcStatus,
             onboardingComplete,
             progressPercent,
         };

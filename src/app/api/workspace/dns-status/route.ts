@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma/client';
 import { success, error } from '@/lib/utils/api-response';
-import { extractDomainFromEmail } from '@/lib/constants/dns-providers';
+import { extractDomainFromEmail, GMAIL_DOMAINS } from '@/lib/constants/dns-providers';
 import type { DnsStatusResponse } from '@/types/dns';
 
 /**
@@ -52,10 +52,14 @@ export async function GET() {
             ? extractDomainFromEmail(workspace.gmailToken.email)
             : null;
 
+        // Personal Gmail accounts (@gmail.com, @googlemail.com) have SPF/DKIM managed by Google
+        // Automatically mark them as PASS since no manual configuration is needed
+        const isPersonalGmail = domain && GMAIL_DOMAINS.includes(domain);
+
         const response: DnsStatusResponse = {
-            spfStatus: workspace.spfStatus,
-            dkimStatus: workspace.dkimStatus,
-            dmarcStatus: workspace.dmarcStatus,
+            spfStatus: isPersonalGmail ? 'PASS' : workspace.spfStatus,
+            dkimStatus: isPersonalGmail ? 'PASS' : workspace.dkimStatus,
+            dmarcStatus: isPersonalGmail ? 'PASS' : workspace.dmarcStatus,
             dkimSelector: workspace.dkimSelector,
             domain,
         };

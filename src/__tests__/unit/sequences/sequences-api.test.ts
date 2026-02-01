@@ -45,7 +45,7 @@ vi.mock('@/lib/prisma/client', () => ({
 
 import { prisma } from '@/lib/prisma/client';
 import { GET, POST } from '@/app/api/sequences/route';
-import { GET as GETById, PUT, DELETE } from '@/app/api/sequences/[id]/route';
+import { GET as GETById, PUT, DELETE, PATCH } from '@/app/api/sequences/[id]/route';
 import { POST as POSTStep } from '@/app/api/sequences/[id]/steps/route';
 
 describe('Sequences API', () => {
@@ -311,4 +311,89 @@ describe('Sequences API', () => {
             expect(prisma.sequence.delete).toHaveBeenCalledWith({ where: { id: 'seq-1' } });
         });
     });
+
+    // Story 4.5: Copilot Email Preview (Mandatory) - AC4
+    describe('PATCH /api/sequences/[id] - Approve Sequence (Story 4.5)', () => {
+        it('should approve sequence with steps and set status to READY', async () => {
+            const mockSequence = {
+                id: 'seq-1',
+                workspaceId: 'test-workspace-id',
+                name: 'Test Sequence',
+                status: 'DRAFT',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                _count: { steps: 2 }, // Has steps
+            };
+
+            const updatedSequence = {
+                ...mockSequence,
+                status: 'READY',
+                steps: [
+                    { id: 'step-1', sequenceId: 'seq-1', order: 1, subject: 'Subject 1', body: 'Body 1', delayDays: 0, createdAt: new Date(), updatedAt: new Date() },
+                    { id: 'step-2', sequenceId: 'seq-1', order: 2, subject: 'Subject 2', body: 'Body 2', delayDays: 3, createdAt: new Date(), updatedAt: new Date() },
+                ],
+            };
+
+            vi.mocked(prisma.sequence.findFirst).mockResolvedValue(mockSequence as any);
+            vi.mocked(prisma.sequence.update).mockResolvedValue(updatedSequence as any);
+
+            const request = new NextRequest('http://localhost/api/sequences/seq-1', {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'READY' }),
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            const response = await PATCH(request, { params: Promise.resolve({ id: 'seq-1' }) });
+            const json = await response.json();
+
+            expect(json.success).toBe(true);
+            expect(json.data.status).toBe('READY');
+        });
+
+        it('should return 400 when approving sequence without steps', async () => {
+            const mockSequence = {
+                id: 'seq-1',
+                workspaceId: 'test-workspace-id',
+                name: 'Empty Sequence',
+                status: 'DRAFT',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                _count: { steps: 0 }, // No steps
+            };
+
+            vi.mocked(prisma.sequence.findFirst).mockResolvedValue(mockSequence as any);
+
+            const request = new NextRequest('http://localhost/api/sequences/seq-1', {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'READY' }),
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            const response = await PATCH(request, { params: Promise.resolve({ id: 'seq-1' }) });
+            const json = await response.json();
+
+            expect(response.status).toBe(400);
+            expect(json.success).toBe(false);
+            expect(json.error.code).toBe('VALIDATION_ERROR');
+            expect(json.error.message).toBe('Impossible d\'approuver une séquence sans étapes');
+        });
+
+        it('should return 404 for non-existent sequence', async () => {
+            vi.mocked(prisma.sequence.findFirst).mockResolvedValue(null);
+
+            const request = new NextRequest('http://localhost/api/sequences/non-existent', {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'READY' }),
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            const response = await PATCH(request, { params: Promise.resolve({ id: 'non-existent' }) });
+            const json = await response.json();
+
+            expect(response.status).toBe(404);
+            expect(json.success).toBe(false);
+            expect(json.error.code).toBe('NOT_FOUND');
+        });
+    });
 });
+

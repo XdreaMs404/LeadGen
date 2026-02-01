@@ -1,22 +1,27 @@
 /**
  * Sequences Page
  * Story 4.1: Sequence Creation (Max 3 Steps) - AC6
+ * Updated Story 4.7: Added template functionality
  */
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
     Layers,
     Sparkles,
     Plus,
     Zap,
     Mail,
+    FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SequenceList } from '@/components/features/sequences/SequenceList';
-import { useSequences, useDeleteSequence } from '@/hooks/use-sequences';
+import { TemplateSelector } from '@/components/features/sequences/TemplateSelector';
+import { SaveTemplateModal } from '@/components/features/sequences/SaveTemplateModal';
+import { useSequences, useDeleteSequence, useDuplicateSequence } from '@/hooks/use-sequences';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,11 +32,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { SequenceListItem } from '@/types/sequence';
 
 export default function SequencesPage() {
+    const router = useRouter();
     const { data, isLoading, error } = useSequences();
     const deleteSequence = useDeleteSequence();
+    const duplicateSequence = useDuplicateSequence();
 
     // Hydration fix
     const [isMounted, setIsMounted] = useState(false);
@@ -42,6 +55,11 @@ export default function SequencesPage() {
     // Delete dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [sequenceToDelete, setSequenceToDelete] = useState<SequenceListItem | null>(null);
+
+    // Template modals state (Story 4.7)
+    const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false);
+    const [saveTemplateModalOpen, setSaveTemplateModalOpen] = useState(false);
+    const [sequenceToTemplate, setSequenceToTemplate] = useState<SequenceListItem | null>(null);
 
     const handleDeleteClick = (sequence: SequenceListItem) => {
         setSequenceToDelete(sequence);
@@ -57,6 +75,26 @@ export default function SequencesPage() {
                 },
             });
         }
+    };
+
+    // Story 4.7 - Duplicate handler
+    const handleDuplicate = (sequence: SequenceListItem) => {
+        duplicateSequence.mutate(sequence.id, {
+            onSuccess: (newSequence) => {
+                router.push(`/sequences/${newSequence.id}/edit`);
+            },
+        });
+    };
+
+    // Story 4.7 - Save as template handler
+    const handleSaveAsTemplate = (sequence: SequenceListItem) => {
+        setSequenceToTemplate(sequence);
+        setSaveTemplateModalOpen(true);
+    };
+
+    // Story 4.7 - Template created success handler
+    const handleTemplateCreated = (sequenceId: string) => {
+        router.push(`/sequences/${sequenceId}/edit`);
     };
 
     const sequences = data?.sequences ?? [];
@@ -116,17 +154,30 @@ export default function SequencesPage() {
                             </div>
                         </div>
 
-                        {/* Action buttons */}
+                        {/* Action buttons - Updated Story 4.7 with dropdown */}
                         <div className="flex items-center gap-3">
-                            <Button
-                                asChild
-                                className="bg-white text-teal-600 hover:bg-white/90 shadow-lg shadow-teal-900/20"
-                            >
-                                <Link href="/sequences/new">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Nouvelle séquence
-                                </Link>
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        className="bg-white text-teal-600 hover:bg-white/90 shadow-lg shadow-teal-900/20"
+                                    >
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Nouvelle séquence
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/sequences/new" className="flex items-center gap-2">
+                                            <Plus className="h-4 w-4" />
+                                            Créer une séquence vide
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTemplateSelectorOpen(true)}>
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Nouveau depuis un modèle
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
                 </div>
@@ -182,12 +233,14 @@ export default function SequencesPage() {
                     </Card>
                 )}
 
-                {/* Sequence list */}
+                {/* Sequence list - Updated Story 4.7 */}
                 {!isEmpty && (
                     <SequenceList
                         sequences={sequences}
                         isLoading={isLoading}
                         onDelete={handleDeleteClick}
+                        onDuplicate={handleDuplicate}
+                        onSaveAsTemplate={handleSaveAsTemplate}
                     />
                 )}
 
@@ -254,6 +307,21 @@ export default function SequencesPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Template Selector Modal - Story 4.7 */}
+            <TemplateSelector
+                open={templateSelectorOpen}
+                onOpenChange={setTemplateSelectorOpen}
+                onSuccess={handleTemplateCreated}
+            />
+
+            {/* Save as Template Modal - Story 4.7 */}
+            <SaveTemplateModal
+                open={saveTemplateModalOpen}
+                onOpenChange={setSaveTemplateModalOpen}
+                sequence={sequenceToTemplate}
+            />
         </div>
     );
 }
+

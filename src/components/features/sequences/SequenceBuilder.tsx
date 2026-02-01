@@ -16,7 +16,7 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { ArrowLeft, Save, Plus, Loader2, Layers } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Loader2, Layers, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,13 +55,27 @@ import {
     useUpdateStep,
     useDeleteStep,
     useReorderSteps,
+    useApproveSequence,
 } from '@/hooks/use-sequences';
+import { usePreviewModal } from '@/hooks/use-preview-modal';
+import { CopilotPreviewModal } from './CopilotPreviewModal';
 import type { Sequence, SequenceStep, CreateStepInput } from '@/types/sequence';
 import { toast } from 'sonner';
 
-import { MAX_STEPS_PER_SEQUENCE, DEFAULT_DELAY_DAYS } from '@/lib/constants/sequences';
+import { MAX_STEPS_PER_SEQUENCE, DEFAULT_DELAY_DAYS, SAMPLE_PROSPECTS } from '@/lib/constants/sequences';
 
 const MAX_STEPS = MAX_STEPS_PER_SEQUENCE;
+
+// Helper to check if HTML body is empty
+const isBodyEmpty = (html: string) => {
+    if (!html || !html.trim()) return true;
+    try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return !doc.body.textContent?.trim();
+    } catch (e) {
+        return !html.replace(/<[^>]*>/g, '').trim(); // Fallback
+    }
+};
 
 interface SequenceBuilderProps {
     sequenceId?: string; // null for create mode, id for edit mode
@@ -84,6 +98,7 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
     const updateStep = useUpdateStep();
     const deleteStep = useDeleteStep();
     const reorderSteps = useReorderSteps();
+    const approveSequence = useApproveSequence();
 
     // Local state
     const [name, setName] = useState('');
@@ -100,6 +115,12 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [stepToDelete, setStepToDelete] = useState<SequenceStep | null>(null);
 
+    // Story 4.5 - Copilot Preview Modal (must be after localSteps declaration)
+    const previewModal = usePreviewModal({
+        steps: localSteps,
+        prospects: SAMPLE_PROSPECTS,
+    });
+
     // Sync from server data
     useEffect(() => {
         if (existingSequence) {
@@ -107,6 +128,7 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
             setLocalSteps(existingSequence.steps);
         }
     }, [existingSequence]);
+
 
     // DnD sensors
     const sensors = useSensors(
@@ -196,7 +218,7 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
 
     // Save step from editor
     const handleSaveStep = useCallback(async () => {
-        if (!stepSubject.trim() || !stepBody.trim()) {
+        if (!stepSubject.trim() || isBodyEmpty(stepBody)) {
             toast.error('Veuillez remplir l\'objet et le contenu');
             return;
         }
@@ -276,23 +298,23 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
         setStepToDelete(null);
     }, [stepToDelete, isEditMode, sequenceId, deleteStep, localSteps]);
 
-    // Save sequence
-    const handleSave = useCallback(async () => {
+    // Save sequence (returns ID if successful)
+    const handleSave = useCallback(async (shouldRedirect = true) => {
         if (!name.trim()) {
             toast.error('Veuillez donner un nom à la séquence');
-            return;
+            return null;
         }
 
         if (localSteps.length === 0) {
             toast.error('Ajoutez au moins une étape à votre séquence');
-            return;
+            return null;
         }
 
         // Check all steps have content
-        const incompleteStep = localSteps.find(s => !s.subject.trim() || !s.body.trim());
+        const incompleteStep = localSteps.find(s => !s.subject.trim() || isBodyEmpty(s.body));
         if (incompleteStep) {
             toast.error('Veuillez compléter toutes les étapes');
-            return;
+            return null;
         }
 
         setIsSaving(true);
@@ -307,9 +329,10 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
                 // But in this builder we save immediate step changes via dialog, so this is mostly for name updates
 
                 toast.success('Séquence enregistrée');
+                return sequenceId;
             } else {
                 // Atomic creation
-                await createSequence.mutateAsync({
+                const newSequence = await createSequence.mutateAsync({
                     name: name.trim(),
                     steps: localSteps.map(step => ({
                         subject: step.subject,
@@ -319,14 +342,48 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
                 });
 
                 toast.success('Séquence enregistrée');
-                router.push('/sequences');
+                if (shouldRedirect) {
+                    router.push('/sequences');
+                }
+                return newSequence.id;
             }
         } catch (error) {
             console.error('Save error:', error);
+            throw error;
         } finally {
             setIsSaving(false);
         }
     }, [name, localSteps, isEditMode, sequenceId, createSequence, updateSequence, addStep, router]);
+
+    // Story 4.5 - Handle sequence approval
+    const handleApprove = useCallback(async () => {
+        let currentSequenceId = sequenceId;
+
+        // If new sequence, save it first (without redirect)
+        if (!currentSequenceId) {
+            currentSequenceId = await handleSave(false) as string | undefined;
+            if (!currentSequenceId) return; // Save failed
+        }
+
+        if (!currentSequenceId) return;
+
+        await approveSequence.mutateAsync(currentSequenceId);
+        previewModal.close();
+        router.push('/sequences');
+    }, [sequenceId, approveSequence, previewModal, router, handleSave]);
+
+    // Story 4.5 - Handle edit from preview modal
+    const handleEditFromPreview = useCallback((stepId: string) => {
+        const step = localSteps.find(s => s.id === stepId);
+        if (step) {
+            previewModal.close();
+            handleEditStep(step);
+        }
+    }, [localSteps, previewModal, handleEditStep]);
+
+    // Story 4.5 - Check if preview button should be enabled
+    const canPreview = name.trim() && localSteps.length > 0 &&
+        localSteps.every(s => s.subject.trim() && !isBodyEmpty(s.body));
 
     const canAddStep = localSteps.length < MAX_STEPS;
 
@@ -359,18 +416,45 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
                         </div>
                     </div>
 
-                    <Button
-                        onClick={handleSave}
-                        disabled={isSaving || !name.trim()}
-                        className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
-                    >
-                        {isSaving ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                        )}
-                        Enregistrer
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {/* Story 4.5 - Preview & Schedule button */}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div>
+                                    <Button
+                                        onClick={previewModal.open}
+                                        disabled={!canPreview}
+                                        className="gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-sm"
+                                    >
+                                        <Eye className="h-4 w-4" />
+                                        Prévisualiser & Programmer
+                                    </Button>
+                                </div>
+                            </TooltipTrigger>
+                            {!canPreview && (
+                                <TooltipContent>
+                                    {localSteps.length === 0
+                                        ? 'Ajoutez au moins une étape'
+                                        : !localSteps.every(s => s.subject.trim() && !isBodyEmpty(s.body))
+                                            ? 'Complétez toutes les étapes'
+                                            : 'Nom de séquence requis'}
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+
+                        <Button
+                            onClick={() => handleSave(true)}
+                            disabled={isSaving || !name.trim()}
+                            className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
+                        >
+                            {isSaving ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                            )}
+                            Enregistrer
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Sequence name */}
@@ -515,6 +599,40 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* Story 4.5 - Copilot Preview Modal */}
+                {/* Render if open, even for new sequences (we use temp sequence object) */}
+                {(isEditMode ? (sequenceId && existingSequence) : true) && (
+                    <CopilotPreviewModal
+                        isOpen={previewModal.isOpen}
+                        onClose={previewModal.close}
+                        sequence={existingSequence || {
+                            id: 'temp',
+                            workspaceId: '',
+                            name: name,
+                            status: 'DRAFT',
+                            steps: [],
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        } as unknown as Sequence}
+                        steps={localSteps}
+                        prospects={SAMPLE_PROSPECTS}
+                        currentProspectIndex={previewModal.currentProspectIndex}
+                        currentStepIndex={previewModal.currentStepIndex}
+                        stepPreviews={previewModal.currentStepPreviews}
+                        totalWarnings={previewModal.totalWarnings}
+                        totalSpamWarnings={previewModal.totalSpamWarnings}
+                        hasHighSpamRisk={previewModal.hasHighSpamRisk}
+                        onNextProspect={previewModal.nextProspect}
+                        onPrevProspect={previewModal.prevProspect}
+                        onGoToStep={previewModal.goToStep}
+                        hasNextProspect={previewModal.hasNextProspect}
+                        hasPrevProspect={previewModal.hasPrevProspect}
+                        onEditStep={handleEditFromPreview}
+                        onApprove={handleApprove}
+                        isApproving={approveSequence.isPending}
+                    />
+                )}
             </div>
         </TooltipProvider>
     );

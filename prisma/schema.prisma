@@ -40,16 +40,37 @@ model Workspace {
   // Onboarding status (Story 2.4)
   onboardingComplete Boolean @default(false) @map("onboarding_complete")
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   prospects      Prospect[]
   gmailToken     GmailToken?
   icpConfig      IcpConfig?
   enrichmentJobs EnrichmentJob[]
   sequences      Sequence[]
   openerCaches   OpenerCache[]
+  campaigns      Campaign[]
+  sendingSettings SendingSettings?
 
   @@map("workspaces")
   @@index([userId])
+}
+
+model SendingSettings {
+  id            String   @id @default(cuid())
+  workspaceId   String   @unique @map("workspace_id")
+  sendingDays   Json     @default("[1,2,3,4,5]") @map("sending_days") // Array of 0-6 (Sun-Sat)
+  startHour     Int      @default(9) @map("start_hour")  // 0-23
+  endHour       Int      @default(18) @map("end_hour")   // 0-23
+  timezone      String   @default("Europe/Paris")
+  dailyQuota    Int      @default(30) @map("daily_quota") // 20-50
+  rampUpEnabled Boolean  @default(true) @map("ramp_up_enabled")
+  fromName      String?  @map("from_name")
+  signature     String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("sending_settings")
 }
 
 model IcpConfig {
@@ -88,9 +109,11 @@ model Prospect {
   deletedAt        DateTime?       @map("deleted_at")
   deletedBy        String?         @map("deleted_by")
 
-  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  enrichmentJobs   EnrichmentJob[]
-  openerCaches     OpenerCache[]
+  workspace            Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  enrichmentJobs       EnrichmentJob[]
+  openerCaches         OpenerCache[]
+  campaignEnrollments  CampaignProspect[]
+  scheduledEmails      ScheduledEmail[]
 
   @@unique([workspaceId, email])
   @@index([workspaceId])
@@ -204,20 +227,46 @@ enum SequenceStatus {
   @@map("sequence_status")
 }
 
-model Sequence {
-  id          String         @id @default(cuid())
-  workspaceId String         @map("workspace_id")
-  name        String
-  status      SequenceStatus @default(DRAFT)
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+enum CampaignStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+  STOPPED
 
-  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  steps        SequenceStep[]
-  openerCaches OpenerCache[]
+  @@map("campaign_status")
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  PAUSED
+  COMPLETED
+  STOPPED
+  REPLIED
+
+  @@map("enrollment_status")
+}
+
+model Sequence {
+  id               String         @id @default(cuid())
+  workspaceId      String         @map("workspace_id")
+  name             String
+  description      String?        // Optional description for templates
+  isTemplate       Boolean        @default(false) @map("is_template")
+  sourceTemplateId String?        @map("source_template_id") // Track origin template
+  status           SequenceStatus @default(DRAFT)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps           SequenceStep[]
+  openerCaches    OpenerCache[]
+  campaigns       Campaign[]
+  scheduledEmails ScheduledEmail[]
 
   @@map("sequences")
   @@index([workspaceId])
+  @@index([isTemplate])
 }
 
 model SequenceStep {
@@ -260,3 +309,93 @@ model OpenerCache {
   @@index([prospectId])
   @@index([sequenceId])
 }
+
+model Campaign {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  name        String
+  sequenceId  String?        @map("sequence_id")
+  status      CampaignStatus @default(DRAFT)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  startedAt   DateTime?      @map("started_at")
+  pausedAt    DateTime?      @map("paused_at")
+  completedAt DateTime?      @map("completed_at")
+  stoppedAt   DateTime?      @map("stopped_at")
+
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sequence        Sequence?          @relation(fields: [sequenceId], references: [id])
+  prospects       CampaignProspect[]
+  scheduledEmails ScheduledEmail[]
+
+  @@map("campaigns")
+  @@index([workspaceId])
+  @@index([status])
+}
+
+
+model CampaignProspect {
+  id               String           @id @default(cuid())
+  campaignId       String           @map("campaign_id")
+  prospectId       String           @map("prospect_id")
+  enrollmentStatus EnrollmentStatus @default(ENROLLED) @map("enrollment_status")
+  currentStep      Int              @default(1) @map("current_step")
+  enrolledAt       DateTime         @default(now()) @map("enrolled_at")
+  pausedAt         DateTime?        @map("paused_at")
+  completedAt      DateTime?        @map("completed_at")
+
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  prospect        Prospect         @relation(fields: [prospectId], references: [id])
+  scheduledEmails ScheduledEmail[]
+
+  @@unique([campaignId, prospectId])
+  @@map("campaign_prospects")
+  @@index([campaignId])
+  @@index([prospectId])
+}
+
+// Story 5.4: Email Scheduling Queue with Idempotency
+enum ScheduledEmailStatus {
+  SCHEDULED          // Initial state, waiting to be picked up
+  SENDING            // Currently being sent (locked)
+  SENT               // Successfully sent
+  FAILED             // Failed, will retry
+  RETRY_SCHEDULED    // Waiting for retry
+  PERMANENTLY_FAILED // Max retries exceeded or non-retryable error
+  CANCELLED          // Campaign stopped or prospect paused
+
+  @@map("scheduled_email_status")
+}
+
+model ScheduledEmail {
+  id                 String               @id @default(cuid())
+  workspaceId        String               @map("workspace_id")
+  campaignId         String               @map("campaign_id")
+  campaignProspectId String               @map("campaign_prospect_id")
+  prospectId         String               @map("prospect_id")
+  sequenceId         String               @map("sequence_id")
+  stepNumber         Int                  @map("step_number")
+  idempotencyKey     String               @unique @map("idempotency_key")
+  status             ScheduledEmailStatus @default(SCHEDULED)
+  scheduledFor       DateTime             @map("scheduled_for")
+  attempts           Int                  @default(0)
+  lastError          String?              @map("last_error") @db.Text
+  nextRetryAt        DateTime?            @map("next_retry_at")
+  messageId          String?              @map("message_id")    // Gmail message ID (Story 5.5)
+  threadId           String?              @map("thread_id")     // Gmail thread ID (Story 5.5)
+  sentAt             DateTime?            @map("sent_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  campaign         Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignProspect CampaignProspect @relation(fields: [campaignProspectId], references: [id], onDelete: Cascade)
+  prospect         Prospect         @relation(fields: [prospectId], references: [id])
+  sequence         Sequence         @relation(fields: [sequenceId], references: [id])
+
+  @@map("scheduled_emails")
+  @@index([workspaceId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([nextRetryAt, status])
+  @@index([campaignId])
+}
+

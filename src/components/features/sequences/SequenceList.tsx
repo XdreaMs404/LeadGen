@@ -8,14 +8,17 @@ interface SequenceListProps {
     sequences: SequenceListItem[];
     isLoading: boolean;
     onDelete: (sequence: SequenceListItem) => void;
+    onDuplicate?: (sequence: SequenceListItem) => void; // Story 4.7
+    onSaveAsTemplate?: (sequence: SequenceListItem) => void; // Story 4.7
 }
 
 /**
  * Sequence List Component
  * Story 4.1 - Task 6
+ * Updated Story 4.7 - Added duplicate and template callbacks
  * Displays sequences in a grid with skeleton loading
  */
-export function SequenceList({ sequences, isLoading, onDelete }: SequenceListProps) {
+export function SequenceList({ sequences, isLoading, onDelete, onDuplicate, onSaveAsTemplate }: SequenceListProps) {
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -43,8 +46,11 @@ export function SequenceList({ sequences, isLoading, onDelete }: SequenceListPro
                     key={sequence.id}
                     sequence={sequence}
                     onDelete={onDelete}
+                    onDuplicate={onDuplicate}
+                    onSaveAsTemplate={onSaveAsTemplate}
                 />
             ))}
         </div>
     );
 }
+

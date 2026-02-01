@@ -33,6 +33,29 @@ export interface EmailResult {
 }
 
 // ============================================================================
+// Opener (Personalization) Types
+// ============================================================================
+
+/**
+ * Context for generating personalized opener text
+ */
+export interface OpenerContext {
+    prospectFirstName: string | null;
+    prospectLastName: string | null;
+    prospectCompany: string | null;
+    prospectTitle: string | null;
+}
+
+/**
+ * Result from opener generation
+ */
+export interface OpenerResult {
+    text: string;
+    generatedAt: string;
+    regenerationsRemaining: number;
+}
+
+// ============================================================================
 // LLM Provider Interface
 // ============================================================================
 
@@ -57,7 +80,8 @@ export type LLMErrorCode =
     | 'RATE_LIMIT_EXCEEDED'
     | 'QUOTA_EXCEEDED'
     | 'PROVIDER_ERROR'
-    | 'INVALID_REQUEST';
+    | 'INVALID_REQUEST'
+    | 'INVALID_CONTEXT';
 
 /**
  * Custom error class for LLM-related errors
@@ -77,5 +101,9 @@ export class LLMError extends Error {
 // Constants
 // ============================================================================
 
+/** Maximum number of regenerations allowed per prospect/step */
+export const MAX_REGENERATIONS = 3;
+
 /** Timeout for LLM generation in milliseconds (30 seconds) */
 export const GENERATION_TIMEOUT_MS = 30_000;
+

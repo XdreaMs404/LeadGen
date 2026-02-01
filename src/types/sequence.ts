@@ -6,6 +6,9 @@ export interface Sequence {
     id: string;
     workspaceId: string;
     name: string;
+    description: string | null; // Story 4.7: Optional description for templates
+    isTemplate: boolean; // Story 4.7: Whether this is a template
+    sourceTemplateId: string | null; // Story 4.7: Original template ID if created from template
     status: SequenceStatusType;
     steps: SequenceStep[];
     stepsCount?: number; // For list view without loading all steps
@@ -55,6 +58,9 @@ export interface SequenceListItem {
     id: string;
     workspaceId: string;
     name: string;
+    description: string | null; // Story 4.7
+    isTemplate: boolean; // Story 4.7
+    sourceTemplateId: string | null; // Story 4.7
     status: SequenceStatusType;
     stepsCount: number;
     createdAt: string;

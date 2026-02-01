@@ -29,7 +29,12 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error');
 
     const cookieStore = await cookies();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    let appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    // In development, force localhost to match the redirect_uri used in the initial request
+    if (process.env.NODE_ENV === 'development') {
+        appUrl = 'http://localhost:3000';
+    }
 
     // Handle OAuth errors (user denied access)
     if (error) {

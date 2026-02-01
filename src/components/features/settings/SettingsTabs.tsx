@@ -16,7 +16,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, User2, Loader2, Mail, AlertTriangle, CheckCircle2, Plug, Target } from 'lucide-react';
+import { Shield, User2, Loader2, Mail, AlertTriangle, CheckCircle2, Plug, Target, Send } from 'lucide-react';
 import { signOut } from '@/lib/auth/actions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import type { User } from '@supabase/supabase-js';
 import { GmailIntegration } from './GmailIntegration';
 import { IcpSettings } from './IcpSettings';
+import { SendingSettingsForm } from './SendingSettingsForm';
 
 interface SettingsTabsProps {
     user: User;
@@ -86,6 +87,13 @@ export function SettingsTabs({ user, gmailConnected, gmailEmail }: SettingsTabsP
                     <Shield className="h-4 w-4" />
                     Sécurité
                 </TabsTrigger>
+                <TabsTrigger
+                    value="sending"
+                    className="flex items-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
+                    <Send className="h-4 w-4" />
+                    Envoi
+                </TabsTrigger>
             </TabsList>
 
             <TabsContent value="general" className="space-y-4">
@@ -147,6 +155,10 @@ export function SettingsTabs({ user, gmailConnected, gmailEmail }: SettingsTabsP
 
             <TabsContent value="icp" className="space-y-4">
                 <IcpSettings />
+            </TabsContent>
+
+            <TabsContent value="sending" className="space-y-4">
+                <SendingSettingsForm />
             </TabsContent>
 
             <TabsContent value="security" className="space-y-4">

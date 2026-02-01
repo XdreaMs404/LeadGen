@@ -53,7 +53,7 @@ export function OnboardingBanner({ className }: OnboardingBannerProps) {
                             {/* Message */}
                             <div className="flex-1">
                                 <Link
-                                    href="/settings/onboarding"
+                                    href="/onboarding"
                                     className="group flex items-center gap-2"
                                 >
                                     <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">

@@ -1221,12 +1221,12 @@ So that **I don't accidentally send to unverified prospects or without proper se
 
 **Given** a user is on the sequence selection step
 **When** they choose a sequence
-**Then** only sequences with status READY are shown (Copilot preview completed)
+**Then** only sequences with status READY are shown (Copilot preview completed) (à revoir, pas pris en compte pour l'instant, tous les prospects sont sélectionnables)
 **And** DRAFT sequences show tooltip: "Complete preview first"
 
 **Given** a user is on the prospect selection step
 **When** they select prospects
-**Then** ONLY prospects with status VERIFIED are selectable (hard rule)
+**Then** ONLY prospects with status VERIFIED are selectable (hard rule) (à revoir, pas pris en compte pour l'instant)
 **And** NOT_VERIFIED and NEEDS_REVIEW are shown grayed with count
 **And** if selected list contains "unknown/paid list" source → warning banner
 
@@ -1236,7 +1236,7 @@ So that **I don't accidentally send to unverified prospects or without proper se
   - ✓ Deliverability onboarding complete (Epic 2)
   - ✓ Gmail connected with valid tokens
   - ✓ Sequence preview approved (Copilot)
-  - ✓ All selected prospects are VERIFIED
+  - ✓ All selected prospects are VERIFIED (à revoir, pas pris en compte pour l'instant, tous les prospects sont sélectionnables)
 **And** if ANY check fails, launch button is disabled with reasons
 
 **Given** all checks pass
