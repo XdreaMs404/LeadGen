@@ -1,0 +1,7 @@
+# .gitignore additions for BMAD Autopilot
+
+# Autopilot state (session-specific)
+.claude/.autopilot_state.json
+
+# Human intervention flag (temporary)
+.claude/HUMAN_NEEDED.md
