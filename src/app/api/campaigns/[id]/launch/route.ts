@@ -5,11 +5,13 @@ import { success, error } from '@/lib/utils/api-response';
 import { assertWorkspaceAccess, getWorkspaceId } from '@/lib/guardrails/workspace-check';
 import { checkPreLaunchRequirements } from '@/lib/guardrails/pre-launch-check';
 import { mapCampaign } from '@/lib/prisma/mappers';
+import { scheduleEmailsForCampaign } from '@/lib/email-scheduler/schedule-emails';
 import { z } from 'zod';
 import { CampaignStatus } from '@prisma/client';
 
 // Validation schema for launch request
 const LaunchCampaignSchema = z.object({
+    sequenceId: z.string().min(1, 'Sélectionnez une séquence'),
     prospectIds: z.array(z.string().min(1)).min(1, 'Sélectionnez au moins un prospect'),
 });
 
@@ -22,12 +24,13 @@ interface RouteParams {
  * Story 5.2: Campaign Launch Wizard with Pre-Launch Gating - AC5
  * 
  * Steps:
- * 1. Validate request (prospectIds array required)
+ * 1. Validate request (sequenceId and prospectIds required)
  * 2. Run pre-launch checks (onboarding, gmail, sequence, prospects)
  * 3. If issues: return LAUNCH_BLOCKED with issue details
- * 4. Update campaign: DRAFT → RUNNING, set startedAt
+ * 4. Update campaign: DRAFT → RUNNING, set startedAt and sequenceId
  * 5. Create CampaignProspect records for selected prospects
- * 6. Return updated campaign with enrollment count
+ * 6. Trigger Email Scheduling (Story 5.4 Fix)
+ * 7. Return updated campaign with enrollment count
  */
 export async function POST(
     req: NextRequest,
@@ -55,12 +58,11 @@ export async function POST(
             );
         }
 
-        const { prospectIds } = parsed.data;
+        const { sequenceId, prospectIds } = parsed.data;
 
         // Check campaign exists and belongs to workspace
         const campaign = await prisma.campaign.findFirst({
             where: { id: campaignId, workspaceId },
-            include: { sequence: { select: { id: true } } },
         });
 
         if (!campaign) {
@@ -78,10 +80,10 @@ export async function POST(
             );
         }
 
-        // Run pre-launch checks
+        // Run pre-launch checks with the provided sequenceId
         const preLaunchResult = await checkPreLaunchRequirements(
             workspaceId,
-            campaign.sequenceId,
+            sequenceId,
             prospectIds
         );
 
@@ -94,10 +96,11 @@ export async function POST(
 
         // Launch the campaign in a transaction
         const updatedCampaign = await prisma.$transaction(async (tx) => {
-            // Update campaign status
+            // Update campaign status and assign the selected sequence
             const updated = await tx.campaign.update({
                 where: { id: campaignId },
                 data: {
+                    sequenceId: sequenceId,
                     status: CampaignStatus.RUNNING,
                     startedAt: new Date(),
                 },
@@ -120,6 +123,19 @@ export async function POST(
             return updated;
         });
 
+        // Trigger email scheduling (Story 5.4 Fix)
+        // We do this AFTER the transaction so that if it fails/timeouts, the campaign is still launched
+        // Ideally this should be a background job, but for now we call it directly
+        let scheduleResult: { scheduled: number; skipped: number; errors: string[] } = { scheduled: 0, skipped: 0, errors: [] };
+        try {
+            console.log(`[LaunchAPI] Triggering email scheduling for campaign ${campaignId}`);
+            scheduleResult = await scheduleEmailsForCampaign(campaignId);
+            console.log(`[LaunchAPI] Scheduling result:`, scheduleResult);
+        } catch (scheduleError) {
+            console.error(`[LaunchAPI] Error scheduling emails for campaign ${campaignId}:`, scheduleError);
+            scheduleResult.errors.push(scheduleError instanceof Error ? scheduleError.message : String(scheduleError));
+        }
+
         // Fetch campaign with enrollment counts for response
         const campaignWithEnrollments = await prisma.campaign.findUnique({
             where: { id: campaignId },
@@ -129,8 +145,24 @@ export async function POST(
             },
         });
 
+        // Convert null to undefined for type compatibility with mapCampaign
+        const mappedCampaign = campaignWithEnrollments ? {
+            ...campaignWithEnrollments,
+            sequence: campaignWithEnrollments.sequence ?? undefined,
+        } : null;
+
+        // Include scheduling info in response
+        const response = {
+            ...mapCampaign(mappedCampaign!),
+            _scheduling: {
+                scheduled: scheduleResult.scheduled,
+                skipped: scheduleResult.skipped,
+                errors: scheduleResult.errors,
+            },
+        };
+
         return NextResponse.json(
-            success(mapCampaign(campaignWithEnrollments!)),
+            success(response),
             { status: 200 }
         );
     } catch (e) {

@@ -19,7 +19,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  workspaces Workspace[]
+  workspaces    Workspace[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -40,6 +41,9 @@ model Workspace {
   // Onboarding status (Story 2.4)
   onboardingComplete Boolean @default(false) @map("onboarding_complete")
 
+  // Story 6.1: Inbox sync tracking
+  lastSyncedAt DateTime? @map("last_synced_at")
+
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   prospects      Prospect[]
   gmailToken     GmailToken?
@@ -49,6 +53,8 @@ model Workspace {
   openerCaches   OpenerCache[]
   campaigns      Campaign[]
   sendingSettings SendingSettings?
+  notifications  Notification[]
+  conversations  Conversation[]
 
   @@map("workspaces")
   @@index([userId])
@@ -114,6 +120,8 @@ model Prospect {
   openerCaches         OpenerCache[]
   campaignEnrollments  CampaignProspect[]
   scheduledEmails      ScheduledEmail[]
+  sentEmails           SentEmail[]
+  conversations        Conversation[]
 
   @@unique([workspaceId, email])
   @@index([workspaceId])
@@ -165,6 +173,8 @@ model GmailToken {
   refreshToken String   @map("refresh_token")  // AES-256-GCM encrypted
   expiresAt    DateTime @map("expires_at")
   email        String                          // Gmail email address
+  isValid      Boolean  @default(true) @map("is_valid") // Story 6.1: Track valid/invalid status
+  lastAuthError String? @map("last_auth_error")         // Story 6.1: Reason for invalidation
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -247,6 +257,54 @@ enum EnrollmentStatus {
   @@map("enrollment_status")
 }
 
+// Story 5.8: Auto-pause reasons for anomaly detection
+enum AutoPauseReason {
+  HIGH_BOUNCE_RATE
+  HIGH_UNSUBSCRIBE_RATE
+  HIGH_COMPLAINT_RATE
+
+  @@map("auto_pause_reason")
+}
+
+// Story 6.1: Inbox models for reply sync
+enum ConversationStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+
+  @@map("conversation_status")
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+
+  @@map("message_direction")
+}
+
+enum ReplyClassification {
+  INTERESTED
+  NOT_INTERESTED
+  NOT_NOW
+  NEGATIVE
+  OUT_OF_OFFICE
+  UNSUBSCRIBE
+  BOUNCE
+  NEEDS_REVIEW
+  OTHER
+
+  @@map("reply_classification")
+}
+
+// Story 6.4: Classification method tracking
+enum ClassificationMethod {
+  RULE
+  LLM
+  MANUAL
+
+  @@map("classification_method")
+}
+
 model Sequence {
   id               String         @id @default(cuid())
   workspaceId      String         @map("workspace_id")
@@ -321,11 +379,14 @@ model Campaign {
   pausedAt    DateTime?      @map("paused_at")
   completedAt DateTime?      @map("completed_at")
   stoppedAt   DateTime?      @map("stopped_at")
+  autoPausedReason AutoPauseReason? @map("auto_paused_reason") // Story 5.8
 
   workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sequence        Sequence?          @relation(fields: [sequenceId], references: [id])
   prospects       CampaignProspect[]
   scheduledEmails ScheduledEmail[]
+  sentEmails      SentEmail[]
+  conversations   Conversation[]
 
   @@map("campaigns")
   @@index([workspaceId])
@@ -397,5 +458,103 @@ model ScheduledEmail {
   @@index([scheduledFor])
   @@index([nextRetryAt, status])
   @@index([campaignId])
+
+  sentEmail SentEmail?
 }
 
+// Story 5.5: Gmail API Email Sending with Threading
+model SentEmail {
+  id               String   @id @default(cuid())
+  workspaceId      String   @map("workspace_id")
+  scheduledEmailId String   @unique @map("scheduled_email_id")
+  campaignId       String   @map("campaign_id")
+  prospectId       String   @map("prospect_id")
+  messageId        String   @map("message_id")     // Gmail message ID
+  threadId         String   @map("thread_id")      // Gmail thread ID
+  subject          String
+  toAddress        String   @map("to_address")
+  headers          Json?                           // Full headers JSON
+  sentAt           DateTime @map("sent_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  scheduledEmail ScheduledEmail @relation(fields: [scheduledEmailId], references: [id], onDelete: Cascade)
+  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  prospect       Prospect       @relation(fields: [prospectId], references: [id])
+
+  @@map("sent_emails")
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([prospectId])
+  @@index([threadId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  userId      String?  @map("user_id")
+  type        String   // ANOMALY_WARNING, ANOMALY_PAUSE
+  severity    String   // WARNING, ERROR, INFO
+  title       String
+  message     String
+  metadata    Json?
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([isRead])
+}
+
+// Story 6.1: Conversation model for inbox reply tracking
+model Conversation {
+  id            String             @id @default(cuid())
+  threadId      String             @map("thread_id")
+  workspaceId   String             @map("workspace_id")
+  prospectId    String?            @map("prospect_id")
+  campaignId    String?            @map("campaign_id")
+  sequenceId    String?            @map("sequence_id")
+  status        ConversationStatus @default(OPEN)
+  lastMessageAt DateTime           @map("last_message_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  prospect  Prospect?     @relation(fields: [prospectId], references: [id])
+  campaign  Campaign?     @relation(fields: [campaignId], references: [id])
+  messages  InboxMessage[]
+
+  @@unique([workspaceId, threadId])
+  @@index([workspaceId])
+  @@index([prospectId])
+  @@map("conversations")
+}
+
+// Story 6.1: InboxMessage model for storing email messages
+model InboxMessage {
+  id              String               @id @default(cuid())
+  conversationId  String               @map("conversation_id")
+  gmailMessageId  String               @map("gmail_message_id")
+  direction       MessageDirection
+  subject         String?
+  bodyRaw         String               @map("body_raw") @db.Text
+  bodyCleaned     String?              @map("body_cleaned") @db.Text
+  fromEmail       String               @map("from_email")
+  toEmail         String               @map("to_email")
+  receivedAt      DateTime             @map("received_at")
+  classification        ReplyClassification?
+  confidenceScore       Int?                   @map("confidence_score")
+  classificationMethod  ClassificationMethod?  @map("classification_method")
+  needsReview           Boolean                @default(false) @map("needs_review")
+  isRead                Boolean                @default(false) @map("is_read")
+  createdAt             DateTime               @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, gmailMessageId])
+  @@index([conversationId])
+  @@map("inbox_messages")
+}

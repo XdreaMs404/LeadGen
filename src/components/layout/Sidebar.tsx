@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Users, Send, Inbox, Settings, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Send, Inbox, Settings, Sparkles, Rocket } from 'lucide-react';
+import { useUnreadCount } from '@/hooks/use-conversations';
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Prospects', href: '/prospects', icon: Users },
     { name: 'Séquences', href: '/sequences', icon: Send },
-    { name: 'Inbox', href: '/inbox', icon: Inbox },
+    { name: 'Campagnes', href: '/campaigns', icon: Rocket },
+    { name: 'Inbox', href: '/inbox', icon: Inbox, showBadge: true },
 ];
 
 const bottomNavItems = [
@@ -18,6 +20,8 @@ const bottomNavItems = [
 
 export function SidebarContent() {
     const pathname = usePathname();
+    const { data: unreadCount } = useUnreadCount();
+    const hasUnread = typeof unreadCount === 'number' && unreadCount > 0;
 
     return (
         <div className="flex h-full flex-col">
@@ -38,6 +42,7 @@ export function SidebarContent() {
                 <nav className="space-y-1">
                     {navItems.map((item) => {
                         const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+                        const showBadge = item.showBadge && hasUnread;
                         return (
                             <Link
                                 key={item.href}
@@ -50,12 +55,17 @@ export function SidebarContent() {
                                 )}
                             >
                                 <div className={cn(
-                                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors relative",
                                     isActive
                                         ? "bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-md shadow-teal-500/25"
                                         : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                                 )}>
                                     <item.icon className="h-4 w-4" />
+                                    {showBadge && (
+                                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                            {(unreadCount ?? 0) > 99 ? '99+' : unreadCount}
+                                        </span>
+                                    )}
                                 </div>
                                 {item.name}
                             </Link>

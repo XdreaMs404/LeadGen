@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Rocket, Check, Loader2, Mail, Users, Shield,
 import { SequenceSelector } from './SequenceSelector';
 import { ProspectSelector } from './ProspectSelector';
 import { PreLaunchReview } from './PreLaunchReview';
-import { useLaunchCampaign } from '@/hooks/use-campaigns';
+import { useLaunchCampaign, useCampaign } from '@/hooks/use-campaigns';
 
 interface CampaignLaunchWizardProps {
     campaignId: string;
@@ -33,6 +33,7 @@ const STEPS = [
 /**
  * CampaignLaunchWizard Component - Story 5.2 (AC1)
  * Fixed layout and accessibility issues
+ * Story 5.6: Pre-populate wizard with existing campaign data for duplicated campaigns
  */
 export function CampaignLaunchWizard({ campaignId, open, onOpenChange }: CampaignLaunchWizardProps) {
     const [state, setState] = useState<WizardState>({
@@ -41,8 +42,56 @@ export function CampaignLaunchWizard({ campaignId, open, onOpenChange }: Campaig
         selectedProspectIds: [],
         canLaunch: false,
     });
+    const [hasInitialized, setHasInitialized] = useState(false);
+
+    // Fetch existing campaign data to pre-populate wizard
+    const { data: campaign } = useCampaign(open ? campaignId : null);
 
     const launchCampaign = useLaunchCampaign();
+
+    // Pre-populate wizard when dialog opens (for duplicated campaigns)
+    useEffect(() => {
+        if (open && campaign && !hasInitialized) {
+            const fetchProspects = async () => {
+                try {
+                    // Fetch campaign prospects to get their IDs
+                    const res = await fetch(`/api/campaigns/${campaignId}/prospects`);
+                    const json = await res.json();
+
+                    if (json.success && json.data?.prospects) {
+                        const prospectIds = json.data.prospects.map((p: { prospectId: string }) => p.prospectId);
+                        setState(prev => ({
+                            ...prev,
+                            selectedSequenceId: campaign.sequenceId || null,
+                            selectedProspectIds: prospectIds,
+                        }));
+                    } else if (campaign.sequenceId) {
+                        // At least pre-select the sequence even if no prospects loaded
+                        setState(prev => ({
+                            ...prev,
+                            selectedSequenceId: campaign.sequenceId,
+                        }));
+                    }
+                } catch {
+                    // If fetch fails, just pre-select sequence
+                    if (campaign.sequenceId) {
+                        setState(prev => ({
+                            ...prev,
+                            selectedSequenceId: campaign.sequenceId,
+                        }));
+                    }
+                }
+            };
+
+            fetchProspects();
+            setHasInitialized(true);
+        }
+
+        // Reset initialization when dialog closes
+        if (!open) {
+            setHasInitialized(false);
+        }
+    }, [open, campaign, campaignId, hasInitialized]);
 
     const handleSequenceSelect = useCallback((sequenceId: string) => {
         setState(prev => ({ ...prev, selectedSequenceId: sequenceId }));
@@ -76,7 +125,7 @@ export function CampaignLaunchWizard({ campaignId, open, onOpenChange }: Campaig
         if (!state.selectedSequenceId || state.selectedProspectIds.length === 0) return;
 
         launchCampaign.mutate(
-            { campaignId, prospectIds: state.selectedProspectIds },
+            { campaignId, sequenceId: state.selectedSequenceId, prospectIds: state.selectedProspectIds },
             {
                 onSuccess: () => {
                     onOpenChange(false);

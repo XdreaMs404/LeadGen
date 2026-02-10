@@ -2,6 +2,7 @@ import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SessionManager } from '@/components/shared/SessionManager';
 import { OnboardingBannerWrapper } from '@/components/shared/OnboardingBannerWrapper';
+import { GmailReconnectBannerWrapper } from '@/components/features/inbox/GmailReconnectBannerWrapper';
 
 export default function DashboardLayout({
     children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
                 <div className="flex flex-1 flex-col overflow-hidden lg:ml-64">
                     <Header />
                     <OnboardingBannerWrapper />
+                    <GmailReconnectBannerWrapper />
                     <main className="flex-1 overflow-y-auto p-6">
                         {children}
                     </main>

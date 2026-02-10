@@ -174,6 +174,7 @@ export function useDeleteCampaign() {
 
 interface LaunchCampaignInput {
     campaignId: string;
+    sequenceId: string;
     prospectIds: string[];
 }
 
@@ -181,9 +182,9 @@ interface LaunchCampaignInput {
  * Hook for launching a campaign
  * Story 5.2: Campaign Launch Wizard - AC5
  * 
- * Sends selected prospects to the launch API which:
+ * Sends selected sequence and prospects to the launch API which:
  * - Runs pre-launch checks
- * - Updates campaign status: DRAFT → RUNNING
+ * - Updates campaign status: DRAFT → RUNNING, assigns sequence
  * - Creates CampaignProspect enrollment records
  */
 export function useLaunchCampaign() {
@@ -191,11 +192,11 @@ export function useLaunchCampaign() {
     const { workspaceId } = useWorkspace();
 
     return useMutation({
-        mutationFn: async ({ campaignId, prospectIds }: LaunchCampaignInput): Promise<CampaignResponse> => {
+        mutationFn: async ({ campaignId, sequenceId, prospectIds }: LaunchCampaignInput): Promise<CampaignResponse> => {
             const res = await fetch(`/api/campaigns/${campaignId}/launch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prospectIds }),
+                body: JSON.stringify({ sequenceId, prospectIds }),
             });
 
             const json: ApiResponse<CampaignResponse> = await res.json();
@@ -221,3 +222,53 @@ export function useLaunchCampaign() {
     });
 }
 
+// ===== useUpdateCampaignStatus Mutation Hook (Story 5.6 + 5.8) =====
+
+interface UpdateStatusInput {
+    campaignId: string;
+    action: 'pause' | 'resume' | 'stop';
+    acknowledgeRisk?: boolean; // Story 5.8: Required for resume after auto-pause
+}
+
+/**
+ * Hook for updating campaign status (pause/resume/stop)
+ * Story 5.6: Campaign Control
+ * Story 5.8: Resume with acknowledgment for auto-paused campaigns
+ */
+export function useUpdateCampaignStatus() {
+    const queryClient = useQueryClient();
+    const { workspaceId } = useWorkspace();
+
+    return useMutation({
+        mutationFn: async ({ campaignId, action, acknowledgeRisk }: UpdateStatusInput): Promise<CampaignResponse> => {
+            const res = await fetch(`/api/campaigns/${campaignId}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, acknowledgeRisk }),
+            });
+
+            const json: ApiResponse<{ campaign: CampaignResponse }> = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.error.message);
+            }
+
+            return json.data.campaign;
+        },
+        onSuccess: (campaign) => {
+            const statusMessages: Record<string, string> = {
+                RUNNING: 'Campagne reprise',
+                PAUSED: 'Campagne en pause',
+                STOPPED: 'Campagne arrêtée',
+            };
+            toast.success(statusMessages[campaign.status] || 'Statut mis à jour');
+            if (workspaceId) {
+                queryClient.invalidateQueries({ queryKey: ['campaigns', workspaceId] });
+                queryClient.invalidateQueries({ queryKey: ['campaigns', workspaceId, campaign.id] });
+            }
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || 'Erreur lors de la mise à jour du statut');
+        },
+    });
+}

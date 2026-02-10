@@ -13,6 +13,10 @@ import {
     RETRYABLE_ERROR_CODES,
     NON_RETRYABLE_ERROR_CODES
 } from '@/types/scheduled-email';
+import {
+    GMAIL_RETRYABLE_ERRORS,
+    GMAIL_NON_RETRYABLE_ERRORS
+} from '@/lib/gmail/sender';
 
 /**
  * Check if an error is retryable
@@ -29,8 +33,18 @@ export function isRetryableError(error: Error | string): boolean {
         return false;
     }
 
+    // Check Gmail specific non-retryable errors
+    if (GMAIL_NON_RETRYABLE_ERRORS.some(code => errorMessage.includes(code) || errorCode === code)) {
+        return false;
+    }
+
     // Check if it's a known retryable error
     if (RETRYABLE_ERROR_CODES.some(code => errorMessage.includes(code) || errorCode === code)) {
+        return true;
+    }
+
+    // Check Gmail specific retryable errors
+    if (GMAIL_RETRYABLE_ERRORS.some(code => errorMessage.includes(code) || errorCode === code)) {
         return true;
     }
 
@@ -258,3 +272,25 @@ export async function cancelProspectEmails(campaignProspectId: string): Promise<
     console.log(`[RetryHandler] Cancelled ${result.count} emails for enrollment ${campaignProspectId}`);
     return result.count;
 }
+
+/**
+ * Mark a single email as cancelled with a reason
+ * 
+ * @param scheduledEmailId - The scheduled email ID
+ * @param reason - The cancellation reason
+ */
+export async function markEmailAsCancelled(
+    scheduledEmailId: string,
+    reason: string
+): Promise<void> {
+    await prisma.scheduledEmail.update({
+        where: { id: scheduledEmailId },
+        data: {
+            status: ScheduledEmailStatus.CANCELLED,
+            lastError: reason,
+        },
+    });
+
+    console.log(`[RetryHandler] Cancelled email ${scheduledEmailId}: ${reason}`);
+}
+

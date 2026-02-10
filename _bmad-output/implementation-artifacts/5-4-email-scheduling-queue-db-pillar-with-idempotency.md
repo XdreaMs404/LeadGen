@@ -445,3 +445,16 @@ Gemini 2.5
 ### Change Log
 
 - 2026-01-31: Story 5.4 implementation complete - Email Scheduling Queue with idempotency, quota enforcement, and retry logic
+
+## Part 2: Code Review & Fixes (Adversarial)
+
+### Critical Issues Fixed
+1. **Broken Launch Flow (AC1)**: The original implementation did not trigger email scheduling upon campaign launch.
+   - **Fix**: Updated `src/app/api/campaigns/[id]/launch/route.ts` to call `scheduleEmailsForCampaign` after the transaction commits.
+2. **Performance / OOM Risk**: `scheduleEmailsForCampaign` loaded all prospects into memory, risking OOM for large lists.
+   - **Fix**: Refactored `src/lib/email-scheduler/schedule-emails.ts` to use cursor-based pagination (batch size: 100) and `createMany` for bulk inserts (N+1 fix).
+3. **Concurrency**: Implemented `skipDuplicates: true` and idempotency checks to prevent race conditions during scheduling.
+
+### Verification
+- `scheduleEmailsForCampaign` now processes 1000s of prospects efficiently without blocking the event loop or crashing memory.
+- `launch/route.ts` correctly triggers the scheduling job.

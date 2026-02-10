@@ -14,7 +14,16 @@ export async function GET() {
     try {
         const workspace = await prisma.workspace.findFirst({
             where: { userId: user.id },
-            select: { id: true, name: true }
+            select: {
+                id: true,
+                name: true,
+                gmailToken: {
+                    select: {
+                        isValid: true,
+                        email: true
+                    }
+                }
+            }
         });
 
         if (!workspace) {

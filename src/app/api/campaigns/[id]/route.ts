@@ -51,7 +51,46 @@ export async function GET(
             );
         }
 
-        return NextResponse.json(success(mapCampaign(campaign)));
+        // Aggregate stats
+        const [scheduledStats, sentStats] = await Promise.all([
+            prisma.scheduledEmail.groupBy({
+                by: ['status'],
+                where: { campaignId: id },
+                _count: true,
+            }),
+            prisma.sentEmail.count({
+                where: { campaignId: id },
+            }),
+        ]);
+
+        // Transform aggregated stats
+        const stats = {
+            sent: sentStats, // Total sent (from SentEmail table)
+            delivered: 0, // Placeholder (requires webhook)
+            opened: 0,    // Placeholder
+            clicked: 0,   // Placeholder
+            replied: 0,   // Placeholder (requires reply tracking)
+            bounced: 0,   // Placeholder
+            scheduled: 0,
+            cancelled: 0,
+        };
+
+        // Fill in scheduled/cancelled from aggregation
+        scheduledStats.forEach(stat => {
+            if (stat.status === 'SCHEDULED' || stat.status === 'RETRY_SCHEDULED') {
+                stats.scheduled += stat._count;
+            } else if (stat.status === 'CANCELLED') {
+                stats.cancelled += stat._count;
+            }
+        });
+
+        // Add stats to the campaign object object for the mapper
+        const campaignWithStats = {
+            ...campaign,
+            stats,
+        };
+
+        return NextResponse.json(success(mapCampaign(campaignWithStats)));
     } catch (e) {
         console.error('GET /api/campaigns/[id] error:', e);
         return NextResponse.json(error('INTERNAL_ERROR', 'Erreur serveur'), { status: 500 });
@@ -146,9 +185,10 @@ export async function DELETE(
             );
         }
 
-        if (campaign.status !== CampaignStatus.DRAFT) {
+        // Only allow deletion of DRAFT or STOPPED campaigns (Story 5.6)
+        if (campaign.status !== CampaignStatus.DRAFT && campaign.status !== CampaignStatus.STOPPED) {
             return NextResponse.json(
-                error('FORBIDDEN', 'Seules les campagnes en brouillon peuvent être supprimées'),
+                error('FORBIDDEN', 'Seules les campagnes en brouillon ou arrêtées peuvent être supprimées'),
                 { status: 403 }
             );
         }

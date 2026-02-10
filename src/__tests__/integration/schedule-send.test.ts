@@ -5,8 +5,8 @@
  * Tests idempotency, quota enforcement, and sending window logic
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { generateIdempotencyKey, parseIdempotencyKey } from '@/lib/utils/idempotency';
+import { describe, it, expect } from 'vitest';
+import { generateIdempotencyKey } from '@/lib/utils/idempotency';
 
 /**
  * Note: Full integration tests require database access and are designed

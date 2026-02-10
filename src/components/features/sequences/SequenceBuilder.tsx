@@ -198,13 +198,16 @@ export function SequenceBuilder({ sequenceId }: SequenceBuilderProps) {
             setEditorDialogOpen(true);
         } else {
             // For create mode, add temp step locally
+            // Story 4.2 - AC2, AC6: First step has 0 delay, subsequent steps have default delay
+            const newOrder = localSteps.length + 1;
+            const isFirstStep = newOrder === 1;
             const tempStep: SequenceStep = {
                 id: `temp-${Date.now()}`,
                 sequenceId: '',
-                order: localSteps.length + 1,
+                order: newOrder,
                 subject: '',
                 body: '',
-                delayDays: 0,
+                delayDays: isFirstStep ? 0 : DEFAULT_DELAY_DAYS,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             };

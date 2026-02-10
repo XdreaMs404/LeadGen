@@ -12,9 +12,9 @@ import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma/client';
 import { success, error } from '@/lib/utils/api-response';
 import { assertWorkspaceAccess, getWorkspaceId } from '@/lib/guardrails/workspace-check';
-import { llm, LLMError, MAX_REGENERATIONS, GENERATION_TIMEOUT_MS } from '@/lib/llm';
+import { llmProvider as llm, LLMError, MAX_REGENERATIONS, GENERATION_TIMEOUT_MS, type OpenerResult } from '@/lib/llm';
 import { z } from 'zod';
-import type { OpenerResult } from '@/types/opener';
+
 
 // ============================================================================
 // Validation Schema

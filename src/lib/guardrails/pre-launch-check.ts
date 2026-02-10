@@ -50,13 +50,13 @@ export interface PreLaunchCheckResult {
  * 4. At least one prospect selected (unverified prospects generate warning, not error)
  * 
  * @param workspaceId - The workspace to check
- * @param sequenceId - The sequence to launch
+ * @param sequenceId - The sequence to launch (can be null if not assigned)
  * @param prospectIds - The selected prospect IDs
  * @returns PreLaunchCheckResult indicating if launch is allowed
  */
 export async function checkPreLaunchRequirements(
     workspaceId: string,
-    sequenceId: string,
+    sequenceId: string | null,
     prospectIds: string[]
 ): Promise<PreLaunchCheckResult> {
     const issues: PreLaunchIssue[] = [];
@@ -123,24 +123,33 @@ export async function checkPreLaunchRequirements(
     }
 
     // Check 4: Sequence status is READY
-    const sequence = await prisma.sequence.findUnique({
-        where: { id: sequenceId },
-        select: { status: true, name: true },
-    });
+    // Handle null sequenceId - campaign has no sequence assigned
+    if (!sequenceId) {
+        issues.push({
+            code: 'SEQUENCE_NOT_READY',
+            message: 'Aucune séquence assignée à cette campagne',
+            severity: 'error',
+        });
+    } else {
+        const sequence = await prisma.sequence.findUnique({
+            where: { id: sequenceId },
+            select: { status: true, name: true },
+        });
 
-    if (!sequence) {
-        issues.push({
-            code: 'SEQUENCE_NOT_READY',
-            message: 'Séquence introuvable',
-            severity: 'error',
-        });
-    } else if (sequence.status !== 'READY') {
-        issues.push({
-            code: 'SEQUENCE_NOT_READY',
-            message: `La séquence "${sequence.name}" n'est pas validée. Complétez l'aperçu copilot.`,
-            severity: 'error',
-            details: { currentStatus: sequence.status },
-        });
+        if (!sequence) {
+            issues.push({
+                code: 'SEQUENCE_NOT_READY',
+                message: 'Séquence introuvable',
+                severity: 'error',
+            });
+        } else if (sequence.status !== 'READY') {
+            issues.push({
+                code: 'SEQUENCE_NOT_READY',
+                message: `La séquence "${sequence.name}" n'est pas validée. Complétez l'aperçu copilot.`,
+                severity: 'error',
+                details: { currentStatus: sequence.status },
+            });
+        }
     }
 
     // Check 5: At least one prospect selected

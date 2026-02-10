@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useCampaigns, useCreateCampaign, useDeleteCampaign } from '@/hooks/use-campaigns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CampaignLaunchWizard } from '@/components/features/campaigns/CampaignLaunchWizard';
+import { CampaignControlBar } from '@/components/features/campaigns/CampaignControlBar';
 import { Plus, Rocket, Trash2, Play, Pause, CheckCircle, XCircle, Loader2, Sparkles, Users, TrendingUp } from 'lucide-react';
 import { CampaignStatus } from '@/types/campaign';
 import { cn } from '@/lib/utils';
@@ -228,17 +230,22 @@ export default function CampaignsPage() {
                                     <CardContent className="p-6">
                                         {/* Header */}
                                         <div className="flex items-start justify-between mb-4">
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-lg text-slate-900 dark:text-white truncate mb-1">
-                                                    {campaign.name}
-                                                </h3>
+                                            <div className="flex-1 min-w-0 mr-4">
+                                                <Link
+                                                    href={`/campaigns/${campaign.id}`}
+                                                    className="block group-hover:text-teal-600 transition-colors"
+                                                >
+                                                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white truncate mb-1">
+                                                        {campaign.name}
+                                                    </h3>
+                                                </Link>
                                                 <p className="text-sm text-slate-500 truncate">
                                                     {campaign.sequence?.name || 'Séquence non définie'}
                                                 </p>
                                             </div>
                                             <Badge
                                                 className={cn(
-                                                    'flex items-center gap-1.5 rounded-full px-3 py-1 font-medium text-xs border-0',
+                                                    'flex items-center gap-1.5 rounded-full px-3 py-1 font-medium text-xs border-0 shrink-0',
                                                     statusConfig.bgColor,
                                                     campaign.status === 'RUNNING' ? 'text-white' : statusConfig.color
                                                 )}
@@ -248,44 +255,50 @@ export default function CampaignsPage() {
                                             </Badge>
                                         </div>
 
-                                        {/* Stats */}
-                                        {campaign.enrollmentCounts && campaign.enrollmentCounts.total > 0 && (
-                                            <div className="grid grid-cols-3 gap-3 mb-6">
-                                                <div className="text-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                                    <div className="flex items-center justify-center gap-1 mb-1">
-                                                        <Users className="h-3.5 w-3.5 text-slate-400" />
+                                        {/* Clickable Area for Stats */}
+                                        <Link href={`/campaigns/${campaign.id}`} className="block">
+                                            {campaign.enrollmentCounts && campaign.enrollmentCounts.total > 0 ? (
+                                                <div className="grid grid-cols-3 gap-3 mb-6 transition-opacity hover:opacity-80">
+                                                    <div className="text-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                                                        <div className="flex items-center justify-center gap-1 mb-1">
+                                                            <Users className="h-3.5 w-3.5 text-slate-400" />
+                                                        </div>
+                                                        <div className="text-lg font-bold text-slate-900 dark:text-white">
+                                                            {campaign.enrollmentCounts.total}
+                                                        </div>
+                                                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                                                            Prospects
+                                                        </div>
                                                     </div>
-                                                    <div className="text-lg font-bold text-slate-900 dark:text-white">
-                                                        {campaign.enrollmentCounts.total}
+                                                    <div className="text-center p-3 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+                                                        <div className="flex items-center justify-center gap-1 mb-1">
+                                                            <TrendingUp className="h-3.5 w-3.5 text-green-500" />
+                                                        </div>
+                                                        <div className="text-lg font-bold text-green-600">
+                                                            {campaign.enrollmentCounts.replied}
+                                                        </div>
+                                                        <div className="text-[10px] uppercase tracking-wide text-green-600/70">
+                                                            Réponses
+                                                        </div>
                                                     </div>
-                                                    <div className="text-[10px] uppercase tracking-wide text-slate-500">
-                                                        Prospects
+                                                    <div className="text-center p-3 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30">
+                                                        <div className="flex items-center justify-center gap-1 mb-1">
+                                                            <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+                                                        </div>
+                                                        <div className="text-lg font-bold text-blue-600">
+                                                            {campaign.enrollmentCounts.completed}
+                                                        </div>
+                                                        <div className="text-[10px] uppercase tracking-wide text-blue-600/70">
+                                                            Terminés
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-center p-3 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
-                                                    <div className="flex items-center justify-center gap-1 mb-1">
-                                                        <TrendingUp className="h-3.5 w-3.5 text-green-500" />
-                                                    </div>
-                                                    <div className="text-lg font-bold text-green-600">
-                                                        {campaign.enrollmentCounts.replied}
-                                                    </div>
-                                                    <div className="text-[10px] uppercase tracking-wide text-green-600/70">
-                                                        Réponses
-                                                    </div>
+                                            ) : (
+                                                <div className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center text-sm text-slate-500 border border-slate-100 dark:border-slate-800">
+                                                    Aucune donnée pour le moment
                                                 </div>
-                                                <div className="text-center p-3 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30">
-                                                    <div className="flex items-center justify-center gap-1 mb-1">
-                                                        <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
-                                                    </div>
-                                                    <div className="text-lg font-bold text-blue-600">
-                                                        {campaign.enrollmentCounts.completed}
-                                                    </div>
-                                                    <div className="text-[10px] uppercase tracking-wide text-blue-600/70">
-                                                        Terminés
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </Link>
 
                                         {/* Actions */}
                                         <div className="flex gap-2">
@@ -308,32 +321,14 @@ export default function CampaignsPage() {
                                                     </Button>
                                                 </>
                                             )}
-                                            {campaign.status === 'RUNNING' && (
-                                                <Button
-                                                    variant="outline"
-                                                    className="flex-1 rounded-xl border-amber-200 text-amber-600 hover:bg-amber-50"
-                                                    disabled
-                                                >
-                                                    <Pause className="h-4 w-4 mr-2" />
-                                                    Mettre en pause
-                                                </Button>
-                                            )}
-                                            {campaign.status === 'PAUSED' && (
-                                                <Button className="flex-1 rounded-xl" disabled>
-                                                    <Play className="h-4 w-4 mr-2" />
-                                                    Reprendre
-                                                </Button>
-                                            )}
-                                            {campaign.status === 'COMPLETED' && (
-                                                <div className="flex-1 flex items-center justify-center gap-2 text-blue-600 text-sm font-medium p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
-                                                    <CheckCircle className="h-4 w-4" />
-                                                    Campagne terminée
-                                                </div>
-                                            )}
-                                            {campaign.status === 'STOPPED' && (
-                                                <div className="flex-1 flex items-center justify-center gap-2 text-red-600 text-sm font-medium p-3 bg-red-50 dark:bg-red-950/30 rounded-xl">
-                                                    <XCircle className="h-4 w-4" />
-                                                    Campagne arrêtée
+                                            {/* Campaign Control Bar for non-draft campaigns */}
+                                            {campaign.status !== 'DRAFT' && (
+                                                <div className="flex-1">
+                                                    <CampaignControlBar
+                                                        campaignId={campaign.id}
+                                                        status={campaign.status}
+                                                        onDelete={() => setDeleteDialogCampaignId(campaign.id)}
+                                                    />
                                                 </div>
                                             )}
                                         </div>

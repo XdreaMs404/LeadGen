@@ -1,4 +1,4 @@
-import type { IcpConfig as PrismaIcpConfig, Prospect as PrismaProspect, Sequence as PrismaSequence, SequenceStep as PrismaSequenceStep, OpenerCache as PrismaOpenerCache, Campaign as PrismaCampaign, CampaignProspect as PrismaCampaignProspect, SendingSettings as PrismaSendingSettings, ScheduledEmail as PrismaScheduledEmail } from '@prisma/client';
+import type { IcpConfig as PrismaIcpConfig, Prospect as PrismaProspect, Sequence as PrismaSequence, SequenceStep as PrismaSequenceStep, OpenerCache as PrismaOpenerCache, Campaign as PrismaCampaign, CampaignProspect as PrismaCampaignProspect, SendingSettings as PrismaSendingSettings, ScheduledEmail as PrismaScheduledEmail, SentEmail as PrismaSentEmail, Conversation as PrismaConversation, InboxMessage as PrismaInboxMessage } from '@prisma/client';
 import type { IcpConfig } from '@/types/icp';
 import type { Prospect } from '@/types/prospect';
 import type { Sequence, SequenceStep, SequenceListItem } from '@/types/sequence';
@@ -6,6 +6,8 @@ import type { OpenerCacheData } from '@/types/opener';
 import type { CampaignResponse, CampaignProspectResponse } from '@/types/campaign';
 import type { SendingSettingsResponse } from '@/types/sending-settings';
 import type { ScheduledEmailResponse } from '@/types/scheduled-email';
+import type { SentEmailResponse } from '@/types/sent-email';
+import type { Conversation, ConversationWithProspect, InboxMessage, ConversationWithMessages } from '@/types/inbox';
 
 /**
  * Transform Prisma SendingSettings model to frontend-friendly JSON
@@ -145,9 +147,10 @@ export function mapOpenerCache(prismaOpenerCache: PrismaOpenerCache, maxRegenera
  */
 export function mapCampaign(
     prismaCampaign: PrismaCampaign & {
-        sequence?: { id: string; name: string };
+        sequence?: { id: string; name: string } | null;
         _count?: { prospects: number };
         prospects?: { enrollmentStatus: string }[];
+        stats?: CampaignResponse['stats'];
     }
 ): CampaignResponse {
     // Calculate enrollment counts if prospects are included
@@ -193,8 +196,10 @@ export function mapCampaign(
         pausedAt: prismaCampaign.pausedAt?.toISOString() ?? null,
         completedAt: prismaCampaign.completedAt?.toISOString() ?? null,
         stoppedAt: prismaCampaign.stoppedAt?.toISOString() ?? null,
+        autoPausedReason: prismaCampaign.autoPausedReason ?? null,
         enrollmentCounts,
-        sequence: prismaCampaign.sequence,
+        stats: prismaCampaign.stats,
+        sequence: prismaCampaign.sequence ?? undefined,
     };
 }
 
@@ -248,5 +253,139 @@ export function mapScheduledEmail(prismaScheduledEmail: PrismaScheduledEmail): S
         sentAt: prismaScheduledEmail.sentAt?.toISOString() ?? null,
         createdAt: prismaScheduledEmail.createdAt.toISOString(),
         updatedAt: prismaScheduledEmail.updatedAt.toISOString(),
+    };
+}
+
+/**
+ * Transform Prisma SentEmail model to frontend-friendly JSON
+ */
+export function mapSentEmail(prismaSentEmail: PrismaSentEmail): SentEmailResponse {
+    return {
+        id: prismaSentEmail.id,
+        workspaceId: prismaSentEmail.workspaceId,
+        scheduledEmailId: prismaSentEmail.scheduledEmailId,
+        campaignId: prismaSentEmail.campaignId,
+        prospectId: prismaSentEmail.prospectId,
+        messageId: prismaSentEmail.messageId,
+        threadId: prismaSentEmail.threadId,
+        subject: prismaSentEmail.subject,
+        toAddress: prismaSentEmail.toAddress,
+        headers: prismaSentEmail.headers as Record<string, string> | null,
+        sentAt: prismaSentEmail.sentAt.toISOString(),
+        createdAt: prismaSentEmail.createdAt.toISOString(),
+    };
+}
+
+/**
+ * Transform Prisma Conversation model to frontend-friendly JSON
+ */
+export function mapConversation(
+    prismaConversation: PrismaConversation & {
+        messages?: PrismaInboxMessage[];
+    }
+): Conversation {
+    return {
+        id: prismaConversation.id,
+        threadId: prismaConversation.threadId,
+        workspaceId: prismaConversation.workspaceId,
+        prospectId: prismaConversation.prospectId,
+        campaignId: prismaConversation.campaignId,
+        sequenceId: prismaConversation.sequenceId,
+        status: prismaConversation.status,
+        lastMessageAt: prismaConversation.lastMessageAt.toISOString(),
+        createdAt: prismaConversation.createdAt.toISOString(),
+        updatedAt: prismaConversation.updatedAt.toISOString(),
+        messages: prismaConversation.messages?.map(mapInboxMessage),
+    };
+}
+
+/**
+ * Transform Prisma Conversation with prospect info for list view
+ */
+export function mapConversationWithProspect(
+    prismaConversation: PrismaConversation & {
+        prospect?: {
+            id: string;
+            email: string;
+            firstName: string | null;
+            lastName: string | null;
+            company: string | null;
+        } | null;
+        campaign?: {
+            id: string;
+            name: string;
+        } | null;
+        messages?: PrismaInboxMessage[];
+    }
+): ConversationWithProspect {
+    return {
+        ...mapConversation(prismaConversation),
+        prospect: prismaConversation.prospect ?? null,
+        campaign: prismaConversation.campaign ?? null,
+    };
+}
+
+/**
+ * Transform Prisma InboxMessage model to frontend-friendly JSON
+ */
+export function mapInboxMessage(prismaMessage: PrismaInboxMessage): InboxMessage {
+    return {
+        id: prismaMessage.id,
+        conversationId: prismaMessage.conversationId,
+        gmailMessageId: prismaMessage.gmailMessageId,
+        direction: prismaMessage.direction,
+        subject: prismaMessage.subject,
+        bodyRaw: prismaMessage.bodyRaw,
+        bodyCleaned: prismaMessage.bodyCleaned,
+        fromEmail: prismaMessage.fromEmail,
+        toEmail: prismaMessage.toEmail,
+        receivedAt: prismaMessage.receivedAt.toISOString(),
+        classification: prismaMessage.classification,
+        isRead: prismaMessage.isRead,
+        createdAt: prismaMessage.createdAt.toISOString(),
+    };
+}
+
+/**
+ * Transform Prisma Conversation with full context (messages, prospect, campaign)
+ */
+export function mapConversationWithMessages(
+    prismaConversation: PrismaConversation & {
+        prospect?: {
+            id: string;
+            email: string;
+            firstName: string | null;
+            lastName: string | null;
+            company: string | null;
+            title?: string | null;
+        } | null;
+        campaign?: {
+            id: string;
+            name: string;
+            status?: string;
+            sequence?: {
+                id: string;
+                name: string;
+            };
+        } | null;
+        messages?: PrismaInboxMessage[];
+    }
+): ConversationWithMessages {
+    return {
+        ...mapConversation(prismaConversation),
+        prospect: prismaConversation.prospect ? {
+            ...prismaConversation.prospect,
+            jobTitle: prismaConversation.prospect.title,
+        } : null,
+        campaign: prismaConversation.campaign ? {
+            id: prismaConversation.campaign.id,
+            name: prismaConversation.campaign.name,
+            status: prismaConversation.campaign.status,
+        } : null,
+        sequence: prismaConversation.campaign?.sequence ? {
+            id: prismaConversation.campaign.sequence.id,
+            name: prismaConversation.campaign.sequence.name,
+        } : null,
+        messages: prismaConversation.messages?.map(mapInboxMessage) ?? [],
     };
 }

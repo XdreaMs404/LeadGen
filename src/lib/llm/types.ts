@@ -56,6 +56,28 @@ export interface OpenerResult {
 }
 
 // ============================================================================
+// Classification Types (Story 6.4)
+// ============================================================================
+
+/**
+ * Context for classifying a reply
+ */
+export interface ClassificationContext {
+    prospectName?: string;
+    campaignName?: string;
+    sequenceName?: string;
+}
+
+/**
+ * Result from reply classification
+ */
+export interface ClassificationResult {
+    classification: string;
+    confidence: number;
+    reasoning: string;
+}
+
+// ============================================================================
 // LLM Provider Interface
 // ============================================================================
 
@@ -69,6 +91,12 @@ export interface LLMProvider {
 
     /** Improve existing email content */
     improveEmail(subject: string, body: string): Promise<EmailResult>;
+
+    /** Generate personalized opener */
+    generateOpener(context: OpenerContext): Promise<string>;
+
+    /** Classify a cold email reply (Story 6.4) */
+    classifyReply(body: string, context?: ClassificationContext): Promise<ClassificationResult>;
 }
 
 // ============================================================================
@@ -106,4 +134,7 @@ export const MAX_REGENERATIONS = 3;
 
 /** Timeout for LLM generation in milliseconds (30 seconds) */
 export const GENERATION_TIMEOUT_MS = 30_000;
+
+/** Timeout for classification in milliseconds (5 seconds) — Story 6.4 NFR3 */
+export const CLASSIFICATION_TIMEOUT_MS = 5_000;
 

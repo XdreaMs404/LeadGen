@@ -10,7 +10,8 @@ import {
     LLMProvider,
     EmailResult,
     LLMError,
-    GENERATION_TIMEOUT_MS
+    GENERATION_TIMEOUT_MS,
+    OpenerContext
 } from './types';
 
 // ============================================================================
@@ -101,6 +102,15 @@ Si des variables sont mal formatées, corrige-les vers le bon format (snake_case
 
 EMAIL ORIGINAL À AMÉLIORER :
 `;
+
+const OPENER_SYSTEM_PROMPT = `Tu es un expert en social selling.
+TON OBJECTIF: Rédiger une phrase d'accroche (opener) hyper-personnalisée pour démarrer une conversation LinkedIn ou Email.
+RÈGLES:
+- Max 2 phrases.
+- Ton simple, conversationnel, pas "vendeur".
+- Doit faire référence au contexte du prospect (titre, entreprise).
+- PAS de "J'espère que vous allez bien".
+- Réponds UNIQUEMENT par le texte de l'opener.`;
 
 // ============================================================================
 // Vertex AI Gemini Provider
@@ -238,6 +248,60 @@ Objet: ${subject}
 Corps:
 ${cleanBody}`;
         return this.callLLM(fullPrompt);
+    }
+
+    async generateOpener(context: OpenerContext): Promise<string> {
+        const prompt = `${OPENER_SYSTEM_PROMPT}
+
+PROSPECT:
+Prénom: ${context.prospectFirstName || 'le prospect'}
+Nom: ${context.prospectLastName || ''}
+Poste: ${context.prospectTitle || 'inconnu'}
+Entreprise: ${context.prospectCompany || 'inconnue'}
+
+Génère l'opener maintenant :`;
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+                reject(new LLMError(
+                    'GENERATION_TIMEOUT',
+                    'La génération a pris trop de temps. Réessayez.'
+                ));
+            }, GENERATION_TIMEOUT_MS);
+        });
+
+        try {
+            const client = this.getClient();
+            const model = client.getGenerativeModel({
+                model: this.modelName,
+                generationConfig: {
+                    temperature: 0.8,
+                    topP: 0.95,
+                    topK: 40,
+                    maxOutputTokens: 150,
+                },
+            });
+
+            const generatePromise = model.generateContent(prompt);
+            const result = await Promise.race([generatePromise, timeoutPromise]);
+            const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+            if (!text) {
+                throw new LLMError('PROVIDER_ERROR', 'La réponse du modèle est vide');
+            }
+
+            return text;
+
+        } catch (error) {
+            if (error instanceof LLMError) throw error;
+
+            // Re-use error handling logic if possible, or just wrap
+            if (error instanceof Error && error.message.includes('429')) {
+                throw new LLMError('RATE_LIMIT_EXCEEDED', 'Limite de requêtes atteinte.', error);
+            }
+
+            throw new LLMError('PROVIDER_ERROR', 'Erreur de génération', error);
+        }
     }
 }
 

@@ -168,24 +168,51 @@ function getDatePartsInTimezone(date: Date, timezone: string): {
  * Note: This is a simplified implementation for MVP
  */
 function setHourInTimezone(date: Date, hour: number, minute: number, timezone: string): Date {
-    // Create a new date with target hour
+    // Get the current offset between UTC and target timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+
+    // Parse the date in the target timezone
+    const parts = formatter.formatToParts(date);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+
+    const year = parseInt(getPart('year'), 10);
+    const month = parseInt(getPart('month'), 10) - 1; // JS months are 0-indexed
+    const day = parseInt(getPart('day'), 10);
+    const currentHour = parseInt(getPart('hour'), 10);
+
+    // Create a date string in the target timezone with the desired hour
+    // Then parse it back to get the correct UTC time
+    const targetDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+
+    // Use the difference between current hour in timezone and current UTC hour to calculate offset
+    const utcHour = date.getUTCHours();
+    const timezoneOffsetHours = currentHour - utcHour;
+
+    // Normalize the offset (handle day boundaries)
+    let normalizedOffset = timezoneOffsetHours;
+    if (normalizedOffset > 12) normalizedOffset -= 24;
+    if (normalizedOffset < -12) normalizedOffset += 24;
+
+    // Create result date in UTC, adjusted for timezone
     const result = new Date(date);
+    result.setUTCFullYear(year, month, day);
+    result.setUTCHours(hour - normalizedOffset, minute, 0, 0);
 
-    // Get current hour in the target timezone
-    let { hour: currentHour } = getDatePartsInTimezone(result, timezone);
-
-    // Calculate the difference and adjust
-    let hourDiff = hour - currentHour;
-    result.setHours(result.getHours() + hourDiff, minute, 0, 0);
-
-    // Double-check if we landed on the correct hour (DST handling)
-    // If we're off by 1 hour (common in DST), adjust again
-    const { hour: newHour } = getDatePartsInTimezone(result, timezone);
-    if (newHour !== hour) {
-        const correction = hour - newHour;
-        // Only correct if difference is small (e.g. key DST shift), avoiding wrap-around issues
+    // Verify the result
+    const { hour: resultHour } = getDatePartsInTimezone(result, timezone);
+    if (resultHour !== hour) {
+        // Apply correction for DST edge cases
+        const correction = hour - resultHour;
         if (Math.abs(correction) <= 2) {
-            result.setHours(result.getHours() + correction);
+            result.setUTCHours(result.getUTCHours() + correction);
         }
     }
 

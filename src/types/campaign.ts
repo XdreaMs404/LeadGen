@@ -3,10 +3,10 @@
  * Story 5.1: Campaign Entity & Status Model
  */
 
-import { CampaignStatus, EnrollmentStatus } from '@prisma/client';
+import { CampaignStatus, EnrollmentStatus, AutoPauseReason } from '@prisma/client';
 
 // Re-export Prisma enums for TypeScript usage
-export { CampaignStatus, EnrollmentStatus };
+export { CampaignStatus, EnrollmentStatus, AutoPauseReason };
 
 /**
  * Campaign response for API endpoints
@@ -15,13 +15,14 @@ export interface CampaignResponse {
     id: string;
     workspaceId: string;
     name: string;
-    sequenceId: string;
+    sequenceId: string | null;
     status: CampaignStatus;
     createdAt: string;
     startedAt: string | null;
     pausedAt: string | null;
     completedAt: string | null;
     stoppedAt: string | null;
+    autoPausedReason: AutoPauseReason | null; // Story 5.8: Why campaign was auto-paused
     // Computed fields from joins
     enrollmentCounts?: {
         total: number;
@@ -30,6 +31,16 @@ export interface CampaignResponse {
         completed: number;
         stopped: number;
         replied: number;
+    };
+    stats?: {
+        sent: number;
+        delivered: number;
+        opened: number;
+        clicked: number;
+        replied: number;
+        bounced: number;
+        scheduled: number;
+        cancelled: number;
     };
     sequence?: {
         id: string;
