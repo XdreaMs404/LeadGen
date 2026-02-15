@@ -7,6 +7,7 @@
  * - limit: Items per page (default: 25)
  * - classification: Filter by classification (comma-separated)
  * - unread: Filter by unread (true/false)
+ * - needsReview: Filter by needs review (true/false)
  * - search: Search by prospect name/email
  * - dateFrom: Filter by date from
  * - dateTo: Filter by date to
@@ -14,10 +15,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { prisma } from '@/lib/prisma/client';
 import { success, error } from '@/lib/utils/api-response';
 import { assertWorkspaceAccess, getWorkspaceId } from '@/lib/guardrails/workspace-check';
-import type { Prisma, ReplyClassification } from '@prisma/client';
+import { ConversationStatus, ReplyClassification } from '@prisma/client';
+import { getConversationsForWorkspace, getUnreadCount } from '@/lib/inbox/conversation-service';
 
 export async function GET(request: NextRequest) {
     try {
@@ -36,107 +37,97 @@ export async function GET(request: NextRequest) {
         const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25', 10)));
         const classificationParam = searchParams.get('classification');
         const unread = searchParams.get('unread') === 'true';
+        const needsReview = searchParams.get('needsReview') === 'true';
+        const statusParam = searchParams.get('status');
         const search = searchParams.get('search')?.trim();
-        const dateFrom = searchParams.get('dateFrom');
-        const dateTo = searchParams.get('dateTo');
+        const dateFromParam = searchParams.get('dateFrom');
+        const dateToParam = searchParams.get('dateTo');
 
-        // Build where clause
-        const where: Prisma.ConversationWhereInput = {
-            workspaceId,
-        };
+        let status: ConversationStatus | undefined;
+        if (statusParam) {
+            if (!Object.values(ConversationStatus).includes(statusParam as ConversationStatus)) {
+                return NextResponse.json(
+                    error('BAD_REQUEST', `Status invalide: ${statusParam}`),
+                    { status: 400 }
+                );
+            }
+            status = statusParam as ConversationStatus;
+        }
 
-        // Classification filter
+        let classifications: ReplyClassification[] | undefined;
         if (classificationParam) {
-            const classifications = classificationParam.split(',') as ReplyClassification[];
-            where.messages = {
-                some: {
-                    classification: { in: classifications },
-                },
-            };
-        }
+            const parsed = classificationParam
+                .split(',')
+                .map((value) => value.trim())
+                .filter(Boolean);
 
-        // Unread filter
-        if (unread) {
-            where.messages = {
-                ...where.messages as Prisma.InboxMessageListRelationFilter,
-                some: {
-                    ...(where.messages as Prisma.InboxMessageListRelationFilter | undefined)?.some,
-                    isRead: false,
-                    direction: 'INBOUND',
-                },
-            };
-        }
-
-        // Date range filter
-        if (dateFrom || dateTo) {
-            where.lastMessageAt = {};
-            if (dateFrom) {
-                where.lastMessageAt.gte = new Date(dateFrom);
+            const invalid = parsed.filter(
+                (value) => !Object.values(ReplyClassification).includes(value as ReplyClassification)
+            );
+            if (invalid.length > 0) {
+                return NextResponse.json(
+                    error('BAD_REQUEST', `Classification invalide: ${invalid.join(', ')}`),
+                    { status: 400 }
+                );
             }
-            if (dateTo) {
-                where.lastMessageAt.lte = new Date(dateTo);
+
+            if (parsed.length > 0) {
+                classifications = parsed as ReplyClassification[];
             }
         }
 
-        // Search filter (by prospect email or name)
-        if (search) {
-            where.prospect = {
-                OR: [
-                    { email: { contains: search, mode: 'insensitive' } },
-                    { firstName: { contains: search, mode: 'insensitive' } },
-                    { lastName: { contains: search, mode: 'insensitive' } },
-                ],
-            };
+        let dateFrom: Date | undefined;
+        if (dateFromParam) {
+            dateFrom = new Date(dateFromParam);
+            if (Number.isNaN(dateFrom.getTime())) {
+                return NextResponse.json(
+                    error('BAD_REQUEST', `dateFrom invalide: ${dateFromParam}`),
+                    { status: 400 }
+                );
+            }
         }
 
-        // Get total count
-        const total = await prisma.conversation.count({ where });
+        let dateTo: Date | undefined;
+        if (dateToParam) {
+            dateTo = new Date(dateToParam);
+            if (Number.isNaN(dateTo.getTime())) {
+                return NextResponse.json(
+                    error('BAD_REQUEST', `dateTo invalide: ${dateToParam}`),
+                    { status: 400 }
+                );
+            }
+        }
 
-        // Get conversations with relations
-        const conversations = await prisma.conversation.findMany({
-            where,
-            include: {
-                prospect: {
-                    select: {
-                        id: true,
-                        email: true,
-                        firstName: true,
-                        lastName: true,
-                        company: true,
-                    },
-                },
-                campaign: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-                messages: {
-                    orderBy: { receivedAt: 'desc' },
-                    take: 1, // Latest message for preview
-                },
-                _count: {
-                    select: {
-                        messages: {
-                            where: {
-                                isRead: false,
-                                direction: 'INBOUND',
-                            },
-                        },
-                    },
-                },
+        const { conversations, total } = await getConversationsForWorkspace(
+            workspaceId,
+            {
+                status,
+                hasUnread: unread,
+                classification: classifications,
+                needsReview,
+                search,
+                dateFrom,
+                dateTo,
             },
-            orderBy: { lastMessageAt: 'desc' },
-            skip: (page - 1) * limit,
-            take: limit,
-        });
+            {
+                skip: (page - 1) * limit,
+                take: limit,
+            }
+        );
+        const normalizedConversations = conversations.map((conversation) => ({
+            ...conversation,
+            lastMessage: conversation.messages?.[0] ?? null,
+            unreadCount: conversation._count?.messages ?? 0,
+        }));
+        const unreadTotal = await getUnreadCount(workspaceId);
 
         return NextResponse.json(
             success({
-                conversations,
+                conversations: normalizedConversations,
                 total,
                 page,
                 limit,
+                unreadTotal,
             })
         );
     } catch (e) {

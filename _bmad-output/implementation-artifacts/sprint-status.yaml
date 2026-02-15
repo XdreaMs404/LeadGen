@@ -107,7 +107,7 @@ development_status:
   epic-6: in-progress
   6-1-gmail-reply-sync-cron-polling-mvp: done
   6-2-conversation-data-model: done
-  6-3-unified-inbox-ui: in-progress
+  6-3-unified-inbox-ui: review
   6-4-ai-reply-classification-with-confidence: ready-for-dev
   6-5-manual-reply-reclassification: backlog
   6-6-reply-suggestions-with-booking-link: backlog

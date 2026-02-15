@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import type { ReplyClassification } from '@prisma/client';
 
 interface ClassificationBadgeProps {
-    classification: ReplyClassification;
+    classification: ReplyClassification | null;
     confidenceScore?: number;
     showConfidence?: boolean;
     size?: 'sm' | 'md';
@@ -22,25 +22,37 @@ const classificationConfig: Record<ReplyClassification, { label: string; classNa
         label: '🔥 Intéressé',
         className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     },
+    NOT_NOW: {
+        label: '⏳ Plus tard',
+        className: 'bg-amber-50 text-amber-700 border-amber-200',
+    },
+    NEGATIVE: {
+        label: '❌ Négatif',
+        className: 'bg-red-50 text-red-700 border-red-200',
+    },
     NOT_INTERESTED: {
         label: '👎 Pas intéressé',
-        className: 'bg-red-50 text-red-700 border-red-200',
+        className: 'bg-amber-50 text-amber-700 border-amber-200',
     },
     OUT_OF_OFFICE: {
         label: '🏖️ Absent',
-        className: 'bg-amber-50 text-amber-700 border-amber-200',
+        className: 'bg-slate-100 text-slate-600 border-slate-300',
     },
     UNSUBSCRIBE: {
         label: '🚫 Désinscrit',
-        className: 'bg-slate-100 text-slate-600 border-slate-300',
+        className: 'bg-red-50 text-red-700 border-red-200',
     },
     BOUNCE: {
         label: '⚠️ Bounce',
-        className: 'bg-rose-50 text-rose-700 border-rose-200',
+        className: 'bg-transparent text-red-700 border-red-300',
+    },
+    NEEDS_REVIEW: {
+        label: '🟠 À revoir',
+        className: 'bg-transparent text-amber-700 border-amber-300',
     },
     OTHER: {
         label: '❓ À vérifier',
-        className: 'bg-violet-50 text-violet-700 border-violet-200',
+        className: 'bg-transparent text-slate-600 border-slate-300',
     },
 };
 
@@ -55,14 +67,24 @@ export function ClassificationBadge({
     showConfidence = true,
     size = 'sm'
 }: ClassificationBadgeProps) {
-    const config = classificationConfig[classification];
-
-    if (!config) {
-        return null;
+    if (classification === null) {
+        return (
+            <span
+                className={cn(
+                    "inline-flex items-center gap-1 rounded-full border font-medium",
+                    "bg-slate-100 text-slate-600 border-slate-300",
+                    sizeClasses[size]
+                )}
+            >
+                Non classé
+            </span>
+        );
     }
 
-    // Show low confidence indicator if score is below 80%
-    const showLowConfidence = showConfidence && confidenceScore !== undefined && confidenceScore < 0.8;
+    const config = classificationConfig[classification];
+
+    // Show low confidence indicator if score is below 70%
+    const showLowConfidence = showConfidence && confidenceScore !== undefined && confidenceScore < 0.7;
 
     return (
         <span

@@ -22,16 +22,16 @@ export function InboxEmptyState() {
 
                 {/* Message */}
                 <h2 className="text-xl font-semibold text-slate-900 mb-2">
-                    Pas encore de réponses
+                    No replies yet — keep prospecting!
                 </h2>
                 <p className="text-slate-600 mb-6">
-                    Votre inbox est vide pour le moment. Continuez à prospecter et les réponses arriveront bientôt ! 🚀
+                    Your inbox is empty for now. Keep running campaigns and replies will appear here.
                 </p>
 
                 {/* CTA */}
                 <Button asChild>
                     <Link href="/campaigns">
-                        Voir mes campagnes
+                        Check your campaigns
                         <ArrowRight className="h-4 w-4 ml-2" />
                     </Link>
                 </Button>

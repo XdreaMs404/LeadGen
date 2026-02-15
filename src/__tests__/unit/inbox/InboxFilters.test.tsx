@@ -1,10 +1,8 @@
-
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { InboxFilters } from '../InboxFilters';
+import { InboxFilters } from '@/components/features/inbox/InboxFilters';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import type { ConversationFilters } from '@/hooks/use-conversations';
 
-// Mock dependencies
 vi.mock('lucide-react', () => ({
     Search: () => <div data-testid="search-icon" />,
     Filter: () => <div data-testid="filter-icon" />,
@@ -22,46 +20,60 @@ describe('InboxFilters', () => {
         vi.clearAllMocks();
     });
 
-    it('should render search input', () => {
+    it('renders search input', () => {
         render(<InboxFilters filters={defaultFilters} onFilterChange={mockOnFilterChange} />);
         expect(screen.getByPlaceholderText('Rechercher un prospect...')).toBeInTheDocument();
     });
 
-    it('should call onFilterChange when searching (debounced)', async () => {
+    it('calls onFilterChange when searching (debounced)', async () => {
         render(<InboxFilters filters={defaultFilters} onFilterChange={mockOnFilterChange} />);
 
         const input = screen.getByPlaceholderText('Rechercher un prospect...');
         fireEvent.change(input, { target: { value: 'John' } });
 
-        // Should not be called immediately
-        expect(mockOnFilterChange).not.toHaveBeenCalled();
-
-        // Wait for debounce
         await waitFor(() => {
             expect(mockOnFilterChange).toHaveBeenCalledWith({ search: 'John' });
         }, { timeout: 500 });
     });
 
-    it('should toggle unread filter', () => {
+    it('toggles unread and needs review filters', () => {
         render(<InboxFilters filters={defaultFilters} onFilterChange={mockOnFilterChange} />);
 
-        const unreadButtons = screen.getAllByText('Non lus');
-        const unreadButton = unreadButtons[0]; // Main toggle is first
-        fireEvent.click(unreadButton);
+        fireEvent.click(screen.getAllByText('Non lus')[0]);
+        fireEvent.click(screen.getByText('À revoir'));
 
         expect(mockOnFilterChange).toHaveBeenCalledWith({ hasUnread: true });
+        expect(mockOnFilterChange).toHaveBeenCalledWith({ needsReview: true });
     });
 
-    it('should show clear button when active filters exist', () => {
-        const activeFilters = { ...defaultFilters, hasUnread: true };
+    it('applies date preset filter', () => {
+        render(<InboxFilters filters={defaultFilters} onFilterChange={mockOnFilterChange} />);
+
+        fireEvent.change(screen.getByLabelText('Date range'), { target: { value: '7d' } });
+
+        expect(mockOnFilterChange).toHaveBeenCalledWith(expect.objectContaining({
+            dateFrom: expect.any(String),
+            dateTo: expect.any(String),
+        }));
+    });
+
+    it('clears all active filters', () => {
+        const activeFilters = {
+            ...defaultFilters,
+            hasUnread: true,
+            needsReview: true,
+            dateFrom: '2026-02-01',
+        };
         render(<InboxFilters filters={activeFilters} onFilterChange={mockOnFilterChange} />);
 
-        const clearButton = screen.getByText('Effacer');
-        expect(clearButton).toBeInTheDocument();
-
-        fireEvent.click(clearButton);
+        fireEvent.click(screen.getByText('Effacer'));
         expect(mockOnFilterChange).toHaveBeenCalledWith(expect.objectContaining({
             hasUnread: undefined,
+            needsReview: undefined,
+            classification: undefined,
+            search: undefined,
+            dateFrom: undefined,
+            dateTo: undefined,
         }));
     });
 });

@@ -84,6 +84,7 @@ export function ConversationDetail({ conversation, isLoading, onClose }: Convers
                     <ProspectInfoSidebar
                         prospect={conversation.prospect}
                         campaign={conversation.campaign}
+                        enrollmentStatus={conversation.status}
                     />
                 </div>
             </div>

@@ -158,15 +158,24 @@ describe('Dropcontact Client', () => {
     });
 
     describe('isEmailVerified', () => {
-        it('should return true for score >= 80', () => {
-            expect(isEmailVerified(80)).toBe(true);
+        it('should return true for score >= 50', () => {
+            expect(isEmailVerified(50)).toBe(true);
             expect(isEmailVerified(95)).toBe(true);
             expect(isEmailVerified(100)).toBe(true);
         });
 
-        it('should return false for score < 80', () => {
-            expect(isEmailVerified(79)).toBe(false);
-            expect(isEmailVerified(50)).toBe(false);
+        it('should return false for score < 50 on non-trusted domains', () => {
+            expect(isEmailVerified(49, 'lead@company.com')).toBe(false);
+            expect(isEmailVerified(0, 'lead@company.com')).toBe(false);
+        });
+
+        it('should trust known personal email domains', () => {
+            expect(isEmailVerified(undefined, 'user@gmail.com')).toBe(true);
+            expect(isEmailVerified(10, 'user@outlook.com')).toBe(true);
+        });
+
+        it('should return true for scores above threshold even without email', () => {
+            expect(isEmailVerified(79)).toBe(true);
             expect(isEmailVerified(0)).toBe(false);
         });
 

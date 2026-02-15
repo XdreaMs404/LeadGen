@@ -49,6 +49,10 @@ export interface ConversationWithMessages extends Conversation {
         id: string;
         name: string;
         status?: string;
+        sequence?: {
+            id: string;
+            name: string;
+        } | null;
     } | null;
     sequence?: {
         id: string;
@@ -147,8 +151,11 @@ export interface WorkspaceSyncResult {
 // ============================================
 
 export interface ConversationListResponse {
-    conversations: ConversationWithProspect[];
+    conversations: ConversationListItem[];
     total: number;
+    page: number;
+    limit: number;
+    unreadTotal: number;
 }
 
 export interface InboxMessageListResponse {

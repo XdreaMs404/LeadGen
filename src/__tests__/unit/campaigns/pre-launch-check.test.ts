@@ -40,10 +40,10 @@ describe('Pre-Launch Check Service - Story 5.2', () => {
         it('returns canLaunch: true when all checks pass', async () => {
             // Setup: all conditions are met
             (prisma.workspace.findUnique as Mock).mockResolvedValue({
-                spfStatus: 'VERIFIED',
-                dkimStatus: 'VERIFIED',
-                dmarcStatus: 'VERIFIED',
-                gmailToken: { id: 'token-123' },
+                spfStatus: 'PASS',
+                dkimStatus: 'PASS',
+                dmarcStatus: 'PASS',
+                gmailToken: { id: 'token-123', email: 'owner@company.com' },
             });
             (prisma.sequence.findUnique as Mock).mockResolvedValue({
                 status: 'READY',
@@ -105,7 +105,10 @@ describe('Pre-Launch Check Service - Story 5.2', () => {
         it('returns GMAIL_TOKEN_INVALID issue when token is expired', async () => {
             (prisma.workspace.findUnique as Mock).mockResolvedValue({
                 onboardingComplete: true,
-                gmailToken: { id: 'token-123' },
+                spfStatus: 'PASS',
+                dkimStatus: 'PASS',
+                dmarcStatus: 'PASS',
+                gmailToken: { id: 'token-123', email: 'owner@company.com' },
             });
             (isTokenValid as Mock).mockResolvedValue(false);
             (prisma.sequence.findUnique as Mock).mockResolvedValue({
@@ -147,8 +150,10 @@ describe('Pre-Launch Check Service - Story 5.2', () => {
 
         it('returns UNVERIFIED_PROSPECTS issue when prospects are not verified', async () => {
             (prisma.workspace.findUnique as Mock).mockResolvedValue({
-                onboardingComplete: true,
-                gmailToken: { id: 'token-123' },
+                spfStatus: 'PASS',
+                dkimStatus: 'PASS',
+                dmarcStatus: 'PASS',
+                gmailToken: { id: 'token-123', email: 'owner@company.com' },
             });
             (prisma.sequence.findUnique as Mock).mockResolvedValue({
                 status: 'READY',

@@ -18,6 +18,7 @@ import type {
     ConversationWithMessages,
     ConversationListResponse,
 } from '@/types/inbox';
+import type { ConversationStatus, ReplyClassification } from '@prisma/client';
 import type { ApiResponse } from '@/lib/utils/api-response';
 
 // ===== Query Key Factory =====
@@ -39,8 +40,13 @@ export const conversationKeys = {
 // ===== Filter Types =====
 
 export interface ConversationFilters {
-    status?: 'OPEN' | 'CLOSED' | 'ARCHIVED';
+    status?: ConversationStatus;
     hasUnread?: boolean;
+    classification?: ReplyClassification[];
+    needsReview?: boolean;
+    search?: string;
+    dateFrom?: string | Date;
+    dateTo?: string | Date;
     page?: number;
     limit?: number;
 }
@@ -53,6 +59,10 @@ export interface ConversationFilters {
  */
 export function useConversations(filters?: ConversationFilters) {
     const { workspaceId } = useWorkspace();
+    const serializeDate = (value?: string | Date) => {
+        if (!value) return null;
+        return value instanceof Date ? value.toISOString() : value;
+    };
 
     return useQuery({
         queryKey: conversationKeys.list(workspaceId || '', filters),
@@ -60,6 +70,15 @@ export function useConversations(filters?: ConversationFilters) {
             const params = new URLSearchParams();
             if (filters?.status) params.set('status', filters.status);
             if (filters?.hasUnread) params.set('unread', 'true');
+            if (filters?.needsReview) params.set('needsReview', 'true');
+            if (filters?.classification && filters.classification.length > 0) {
+                params.set('classification', filters.classification.join(','));
+            }
+            if (filters?.search?.trim()) params.set('search', filters.search.trim());
+            const dateFrom = serializeDate(filters?.dateFrom);
+            if (dateFrom) params.set('dateFrom', dateFrom);
+            const dateTo = serializeDate(filters?.dateTo);
+            if (dateTo) params.set('dateTo', dateTo);
             if (filters?.page) params.set('page', filters.page.toString());
             if (filters?.limit) params.set('limit', filters.limit.toString());
 
@@ -75,6 +94,13 @@ export function useConversations(filters?: ConversationFilters) {
         placeholderData: keepPreviousData,
         enabled: !!workspaceId,
     });
+}
+
+/**
+ * Alias explicite pour la page Inbox
+ */
+export function useInboxConversations(filters?: ConversationFilters) {
+    return useConversations(filters);
 }
 
 // ===== useConversation Hook =====

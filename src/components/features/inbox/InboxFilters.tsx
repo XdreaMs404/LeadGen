@@ -35,9 +35,12 @@ interface InboxFiltersProps {
 const classificationOptions: { value: ReplyClassification; label: string }[] = [
     { value: 'INTERESTED', label: 'Intéressé' },
     { value: 'NOT_INTERESTED', label: 'Pas intéressé' },
+    { value: 'NOT_NOW', label: 'Pas maintenant' },
+    { value: 'NEGATIVE', label: 'Négatif' },
     { value: 'OUT_OF_OFFICE', label: 'Absent' },
     { value: 'UNSUBSCRIBE', label: 'Désinscrit' },
     { value: 'BOUNCE', label: 'Bounce' },
+    { value: 'NEEDS_REVIEW', label: 'À revoir' },
     { value: 'OTHER', label: 'Autre' },
 ];
 
@@ -50,6 +53,9 @@ interface QuickFilter {
 export function InboxFilters({ filters, onFilterChange }: InboxFiltersProps) {
     const [searchValue, setSearchValue] = useState('');
     const [selectedClassifications, setSelectedClassifications] = useState<ReplyClassification[]>([]);
+    const [datePreset, setDatePreset] = useState<'all' | '7d' | '30d' | 'custom'>('all');
+    const [customDateFrom, setCustomDateFrom] = useState('');
+    const [customDateTo, setCustomDateTo] = useState('');
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
     // Debounced search using useEffect
@@ -92,13 +98,58 @@ export function InboxFilters({ filters, onFilterChange }: InboxFiltersProps) {
         onFilterChange({ hasUnread: !filters.hasUnread });
     }, [filters.hasUnread, onFilterChange]);
 
+    const handleNeedsReviewToggle = useCallback(() => {
+        onFilterChange({ needsReview: !filters.needsReview });
+    }, [filters.needsReview, onFilterChange]);
+
+    const handleDatePresetChange = useCallback((value: 'all' | '7d' | '30d' | 'custom') => {
+        setDatePreset(value);
+
+        if (value === 'all') {
+            onFilterChange({ dateFrom: undefined, dateTo: undefined });
+            return;
+        }
+
+        if (value === 'custom') {
+            onFilterChange({
+                dateFrom: customDateFrom || undefined,
+                dateTo: customDateTo || undefined,
+            });
+            return;
+        }
+
+        const now = new Date();
+        const from = new Date(now);
+        from.setDate(now.getDate() - (value === '7d' ? 7 : 30));
+        onFilterChange({
+            dateFrom: from.toISOString(),
+            dateTo: now.toISOString(),
+        });
+    }, [customDateFrom, customDateTo, onFilterChange]);
+
+    useEffect(() => {
+        if (datePreset !== 'custom') {
+            return;
+        }
+        onFilterChange({
+            dateFrom: customDateFrom || undefined,
+            dateTo: customDateTo || undefined,
+        });
+    }, [customDateFrom, customDateTo, datePreset, onFilterChange]);
+
     const handleClearFilters = useCallback(() => {
         setSearchValue('');
         setSelectedClassifications([]);
+        setDatePreset('all');
+        setCustomDateFrom('');
+        setCustomDateTo('');
         onFilterChange({
             hasUnread: undefined,
+            needsReview: undefined,
             classification: undefined,
             search: undefined,
+            dateFrom: undefined,
+            dateTo: undefined,
         } as Partial<ConversationFilters>);
     }, [onFilterChange]);
 
@@ -107,21 +158,27 @@ export function InboxFilters({ filters, onFilterChange }: InboxFiltersProps) {
         {
             id: 'unread',
             label: 'Non lus',
-            apply: () => ({ hasUnread: true }),
+            apply: () => ({ hasUnread: true, needsReview: undefined, classification: undefined, dateFrom: undefined, dateTo: undefined }),
         },
         {
             id: 'interested',
             label: 'Intéressés',
-            apply: () => ({ classification: ['INTERESTED'] as ReplyClassification[] } as Partial<ConversationFilters>),
+            apply: () => ({ hasUnread: undefined, needsReview: undefined, classification: ['INTERESTED'] as ReplyClassification[], dateFrom: undefined, dateTo: undefined } as Partial<ConversationFilters>),
         },
         {
             id: 'needs-action',
             label: 'À traiter',
-            apply: () => ({ classification: ['OTHER', 'INTERESTED'] as ReplyClassification[] } as Partial<ConversationFilters>),
+            apply: () => ({ hasUnread: undefined, needsReview: true, classification: undefined, dateFrom: undefined, dateTo: undefined } as Partial<ConversationFilters>),
         },
     ], []);
 
-    const hasActiveFilters = filters.hasUnread || selectedClassifications.length > 0 || searchValue;
+    const hasActiveFilters =
+        Boolean(filters.hasUnread) ||
+        Boolean(filters.needsReview) ||
+        selectedClassifications.length > 0 ||
+        Boolean(searchValue) ||
+        Boolean(filters.dateFrom) ||
+        Boolean(filters.dateTo);
 
     return (
         <div className="flex flex-wrap items-center gap-3">
@@ -183,6 +240,52 @@ export function InboxFilters({ filters, onFilterChange }: InboxFiltersProps) {
                 Non lus
             </Button>
 
+            <Button
+                variant={filters.needsReview ? "default" : "outline"}
+                size="sm"
+                onClick={handleNeedsReviewToggle}
+                className={cn(
+                    filters.needsReview && "bg-amber-500 hover:bg-amber-600"
+                )}
+            >
+                À revoir
+            </Button>
+
+            <div className="flex items-center gap-2">
+                <label htmlFor="inbox-date-range" className="text-xs text-slate-500">Période</label>
+                <select
+                    id="inbox-date-range"
+                    aria-label="Date range"
+                    value={datePreset}
+                    onChange={(e) => handleDatePresetChange(e.target.value as 'all' | '7d' | '30d' | 'custom')}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                >
+                    <option value="all">Toutes dates</option>
+                    <option value="7d">7 derniers jours</option>
+                    <option value="30d">30 derniers jours</option>
+                    <option value="custom">Personnalisé</option>
+                </select>
+            </div>
+
+            {datePreset === 'custom' && (
+                <div className="flex items-center gap-2">
+                    <Input
+                        type="date"
+                        aria-label="Date début"
+                        value={customDateFrom}
+                        onChange={(e) => setCustomDateFrom(e.target.value)}
+                        className="h-9 w-[160px]"
+                    />
+                    <Input
+                        type="date"
+                        aria-label="Date fin"
+                        value={customDateTo}
+                        onChange={(e) => setCustomDateTo(e.target.value)}
+                        className="h-9 w-[160px]"
+                    />
+                </div>
+            )}
+
             {/* Quick filters */}
             <div className="hidden md:flex items-center gap-2 border-l border-slate-200 pl-3">
                 {quickFilters.map((filter) => (
@@ -192,8 +295,13 @@ export function InboxFilters({ filters, onFilterChange }: InboxFiltersProps) {
                         size="sm"
                         onClick={() => {
                             const applied = filter.apply();
+                            setDatePreset('all');
+                            setCustomDateFrom('');
+                            setCustomDateTo('');
                             if ('classification' in applied && applied.classification) {
                                 setSelectedClassifications(applied.classification as ReplyClassification[]);
+                            } else if ('classification' in applied && !applied.classification) {
+                                setSelectedClassifications([]);
                             }
                             onFilterChange(applied);
                         }}

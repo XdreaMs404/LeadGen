@@ -122,7 +122,7 @@ describe('OnboardingProgressCard', () => {
         );
 
         const button = screen.getByRole('link', { name: /Continuer la configuration/i });
-        expect(button).toHaveAttribute('href', '/settings/onboarding');
+        expect(button).toHaveAttribute('href', '/onboarding');
     });
 
     it('has correct test id', () => {

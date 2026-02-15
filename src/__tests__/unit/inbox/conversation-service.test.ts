@@ -247,6 +247,49 @@ describe('Conversation Service', () => {
                 },
             });
         });
+
+        it('should filter by classification and needs review', async () => {
+            vi.mocked(prisma.conversation.count).mockResolvedValue(2);
+            vi.mocked(prisma.conversation.findMany).mockResolvedValue([]);
+
+            await getConversationsForWorkspace('ws-1', {
+                classification: ['INTERESTED'],
+                needsReview: true,
+            });
+
+            expect(prisma.conversation.count).toHaveBeenCalledWith({
+                where: {
+                    workspaceId: 'ws-1',
+                    messages: {
+                        some: {
+                            direction: 'INBOUND',
+                            classification: { in: ['INTERESTED'] },
+                            needsReview: true,
+                        },
+                    },
+                },
+            });
+        });
+
+        it('should filter by search term on prospect identity fields', async () => {
+            vi.mocked(prisma.conversation.count).mockResolvedValue(1);
+            vi.mocked(prisma.conversation.findMany).mockResolvedValue([]);
+
+            await getConversationsForWorkspace('ws-1', { search: 'john' });
+
+            expect(prisma.conversation.count).toHaveBeenCalledWith({
+                where: {
+                    workspaceId: 'ws-1',
+                    prospect: {
+                        OR: [
+                            { email: { contains: 'john', mode: 'insensitive' } },
+                            { firstName: { contains: 'john', mode: 'insensitive' } },
+                            { lastName: { contains: 'john', mode: 'insensitive' } },
+                        ],
+                    },
+                },
+            });
+        });
     });
 
     describe('markConversationAsRead', () => {

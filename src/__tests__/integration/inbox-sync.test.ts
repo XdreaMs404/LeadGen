@@ -4,36 +4,38 @@ import { GmailSendError } from '@/lib/gmail/sender';
 import { fetchNewMessages } from '@/lib/gmail/inbox-sync';
 
 // Mock Prisma
-const mockPrisma = {
-    workspace: {
-        findMany: vi.fn(),
-        findUnique: vi.fn(),
-        update: vi.fn(),
+const { mockPrisma } = vi.hoisted(() => ({
+    mockPrisma: {
+        workspace: {
+            findMany: vi.fn(),
+            findUnique: vi.fn(),
+            update: vi.fn(),
+        },
+        gmailToken: {
+            update: vi.fn(),
+        },
+        sentEmail: {
+            findFirst: vi.fn(),
+        },
+        conversation: {
+            upsert: vi.fn().mockResolvedValue({ id: 'conv-1' }),
+        },
+        inboxMessage: {
+            upsert: vi.fn(),
+        },
+        campaignProspect: {
+            findUnique: vi.fn(),
+            update: vi.fn(),
+        },
+        scheduledEmail: {
+            findUnique: vi.fn(),
+            updateMany: vi.fn(),
+        },
+        prospect: {
+            findUnique: vi.fn(),
+        },
     },
-    gmailToken: {
-        update: vi.fn(),
-    },
-    sentEmail: {
-        findFirst: vi.fn(),
-    },
-    conversation: {
-        upsert: vi.fn().mockResolvedValue({ id: 'conv-1' }),
-    },
-    inboxMessage: {
-        upsert: vi.fn(),
-    },
-    campaignProspect: {
-        findUnique: vi.fn(),
-        update: vi.fn(),
-    },
-    scheduledEmail: {
-        findUnique: vi.fn(),
-        updateMany: vi.fn(),
-    },
-    prospect: {
-        findUnique: vi.fn(),
-    }
-};
+}));
 
 vi.mock('@/lib/prisma/client', () => ({
     prisma: mockPrisma,

@@ -8,6 +8,10 @@ vi.mock('next/navigation', () => ({
     usePathname: vi.fn(),
 }));
 
+vi.mock('@/hooks/use-conversations', () => ({
+    useUnreadCount: vi.fn(() => ({ data: 0 })),
+}));
+
 describe('Sidebar Component', () => {
     it('renders all navigation links', () => {
         (usePathname as any).mockReturnValue('/dashboard');

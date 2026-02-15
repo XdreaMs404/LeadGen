@@ -27,10 +27,15 @@ interface ProspectInfoSidebarProps {
         id: string;
         name: string;
         status?: string;
+        sequence?: {
+            id: string;
+            name: string;
+        } | null;
     } | null;
+    enrollmentStatus?: string | null;
 }
 
-export function ProspectInfoSidebar({ prospect, campaign }: ProspectInfoSidebarProps) {
+export function ProspectInfoSidebar({ prospect, campaign, enrollmentStatus }: ProspectInfoSidebarProps) {
     return (
         <div className="p-4 space-y-6">
             {/* Prospect Info */}
@@ -93,6 +98,12 @@ export function ProspectInfoSidebar({ prospect, campaign }: ProspectInfoSidebarP
                                     <p className="text-sm font-medium text-slate-900">{campaign.name}</p>
                                     {campaign.status && (
                                         <p className="text-xs text-slate-500 capitalize">{campaign.status.toLowerCase()}</p>
+                                    )}
+                                    {campaign.sequence?.name && (
+                                        <p className="text-xs text-slate-500">Séquence: {campaign.sequence.name}</p>
+                                    )}
+                                    {enrollmentStatus && (
+                                        <p className="text-xs text-slate-500">Statut: {enrollmentStatus.toLowerCase()}</p>
                                     )}
                                 </div>
                             </div>

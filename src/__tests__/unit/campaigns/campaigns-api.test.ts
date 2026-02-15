@@ -34,6 +34,12 @@ vi.mock('@/lib/prisma/client', () => ({
         sequence: {
             findFirst: vi.fn(),
         },
+        scheduledEmail: {
+            groupBy: vi.fn(),
+        },
+        sentEmail: {
+            count: vi.fn(),
+        },
     },
 }));
 
@@ -156,6 +162,8 @@ describe('Campaigns API', () => {
             };
 
             vi.mocked(prisma.campaign.findFirst).mockResolvedValue(mockCampaign as any);
+            vi.mocked(prisma.scheduledEmail.groupBy).mockResolvedValue([] as any);
+            vi.mocked(prisma.sentEmail.count).mockResolvedValue(0);
 
             const request = new NextRequest('http://localhost/api/campaigns/camp-1');
             const response = await GETById(request, { params: Promise.resolve({ id: 'camp-1' }) });

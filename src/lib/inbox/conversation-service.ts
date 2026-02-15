@@ -6,7 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma/client';
-import type { ConversationStatus, Prisma } from '@prisma/client';
+import type { ConversationStatus, Prisma, ReplyClassification } from '@prisma/client';
 
 /**
  * Filters for conversation queries
@@ -14,6 +14,9 @@ import type { ConversationStatus, Prisma } from '@prisma/client';
 export interface ConversationFilters {
     status?: ConversationStatus;
     hasUnread?: boolean;
+    classification?: ReplyClassification[];
+    needsReview?: boolean;
+    search?: string;
     dateFrom?: Date;
     dateTo?: Date;
 }
@@ -110,7 +113,7 @@ export async function getConversationsForProspect(prospectId: string) {
  * Used by unified inbox UI (AC3)
  * 
  * @param workspaceId - The workspace ID
- * @param filters - Optional filters (status, unread, date range)
+ * @param filters - Optional filters (status, unread, classification, needsReview, search, date range)
  * @param pagination - Pagination options
  * @returns Paginated list of conversations with prospect/campaign info
  */
@@ -128,13 +131,45 @@ export async function getConversationsForWorkspace(
         where.status = filters.status;
     }
 
+    const inboundMessageWhere: Prisma.InboxMessageWhereInput = {
+        direction: 'INBOUND',
+    };
+    let hasMessageFilters = false;
+
     if (filters?.hasUnread) {
-        where.messages = {
-            some: {
-                isRead: false,
-                direction: 'INBOUND', // Only count unread inbound messages
-            },
+        inboundMessageWhere.isRead = false;
+        hasMessageFilters = true;
+    }
+
+    if (filters?.classification && filters.classification.length > 0) {
+        inboundMessageWhere.classification = {
+            in: filters.classification,
         };
+        hasMessageFilters = true;
+    }
+
+    if (filters?.needsReview) {
+        inboundMessageWhere.needsReview = true;
+        hasMessageFilters = true;
+    }
+
+    if (hasMessageFilters) {
+        where.messages = {
+            some: inboundMessageWhere,
+        };
+    }
+
+    if (filters?.search) {
+        const term = filters.search.trim();
+        if (term.length > 0) {
+            where.prospect = {
+                OR: [
+                    { email: { contains: term, mode: 'insensitive' } },
+                    { firstName: { contains: term, mode: 'insensitive' } },
+                    { lastName: { contains: term, mode: 'insensitive' } },
+                ],
+            };
+        }
     }
 
     if (filters?.dateFrom || filters?.dateTo) {
@@ -186,7 +221,7 @@ export async function getConversationsForWorkspace(
         },
         orderBy: { lastMessageAt: 'desc' },
         skip: pagination?.skip ?? 0,
-        take: pagination?.take ?? 20,
+        take: pagination?.take ?? 25,
     });
 
     return {

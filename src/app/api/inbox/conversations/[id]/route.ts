@@ -2,14 +2,14 @@
  * Inbox Conversation Detail API Route (Story 6.3 AC3, AC5)
  * 
  * GET: Returns single conversation with all messages
- * PATCH: Mark conversation as read
+ * PATCH: Backward-compatible alias to mark conversation as read
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { prisma } from '@/lib/prisma/client';
 import { success, error } from '@/lib/utils/api-response';
 import { assertWorkspaceAccess } from '@/lib/guardrails/workspace-check';
+import { getConversationWithMessages, markConversationAsRead } from '@/lib/inbox/conversation-service';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -25,32 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
         const { id: conversationId } = await params;
 
-        // Get conversation with all messages
-        const conversation = await prisma.conversation.findUnique({
-            where: { id: conversationId },
-            include: {
-                prospect: {
-                    select: {
-                        id: true,
-                        email: true,
-                        firstName: true,
-                        lastName: true,
-                        company: true,
-                        title: true,
-                    },
-                },
-                campaign: {
-                    select: {
-                        id: true,
-                        name: true,
-                        status: true,
-                    },
-                },
-                messages: {
-                    orderBy: { receivedAt: 'asc' }, // Chronological order
-                },
-            },
-        });
+        const conversation = await getConversationWithMessages(conversationId);
 
         if (!conversation) {
             return NextResponse.json(error('NOT_FOUND', 'Conversation non trouvée'), { status: 404 });
@@ -76,11 +51,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
         const { id: conversationId } = await params;
 
-        // Get conversation to verify workspace
-        const conversation = await prisma.conversation.findUnique({
-            where: { id: conversationId },
-            select: { workspaceId: true },
-        });
+        const conversation = await getConversationWithMessages(conversationId);
 
         if (!conversation) {
             return NextResponse.json(error('NOT_FOUND', 'Conversation non trouvée'), { status: 404 });
@@ -89,19 +60,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         // Verify workspace access
         await assertWorkspaceAccess(user.id, conversation.workspaceId);
 
-        // Mark all inbound messages as read
-        const result = await prisma.inboxMessage.updateMany({
-            where: {
-                conversationId,
-                isRead: false,
-                direction: 'INBOUND',
-            },
-            data: {
-                isRead: true,
-            },
-        });
+        const marked = await markConversationAsRead(conversationId);
 
-        return NextResponse.json(success({ marked: result.count }));
+        return NextResponse.json(success({ marked }));
     } catch (e) {
         console.error('[inbox/conversations/[id]] PATCH Error:', e);
         return NextResponse.json(error('INTERNAL_ERROR', 'Erreur serveur'), { status: 500 });

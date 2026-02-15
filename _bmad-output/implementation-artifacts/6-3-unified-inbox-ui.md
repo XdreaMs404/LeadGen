@@ -1,6 +1,6 @@
 # Story 6.3: Unified Inbox UI
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -81,19 +81,21 @@ So that **I can efficiently review and respond to prospects**.
 - [ ] Create `src/components/features/inbox/ConversationListItem.tsx`
   - Individual conversation row component
   - Hover and selected states
-  - Classification badge (color-coded: Interested=green, Not Now=amber, Negative=red, OOO=gray, Needs Review=amber outline)
+  - Classification badge (color-coded: Interested=green, Not Interested=amber, Not Now=amber, Negative=red, Out of Office=gray, Needs Review=amber outline)
 
 ### Task 3: Create Classification Badge Component (AC: 2)
 - [ ] Create `src/components/features/inbox/ClassificationBadge.tsx`
   - Props: `classification: ReplyClassification | null`
   - Color scheme:
     - INTERESTED: green
+    - NOT_INTERESTED: amber
     - NOT_NOW: amber
     - NEGATIVE: red
-    - OOO: gray
+    - OUT_OF_OFFICE: gray
     - BOUNCE: red outline
     - UNSUBSCRIBE: red
     - NEEDS_REVIEW: amber outline
+    - OTHER: gray outline
     - null: gray "Unclassified"
   - Show confidence indicator if < 70%
 
@@ -144,21 +146,28 @@ So that **I can efficiently review and respond to prospects**.
 ### Task 9: Create API Route for Conversations (AC: 1, 4, 8)
 - [ ] Create `src/app/api/inbox/conversations/route.ts`
   - GET: Return paginated conversations for workspace
-  - Query params: `page`, `limit`, `classification`, `unread`, `search`, `dateFrom`, `dateTo`
-  - Use `getConversationsForWorkspace` from conversation-service
-  - Return: `{ success: true, data: { conversations, total, page, limit } }`
+  - Query params: `page`, `limit`, `classification`, `unread`, `needsReview`, `search`, `dateFrom`, `dateTo`
+  - Use `getConversationsForWorkspace` from conversation-service **after extending filters to support `classification`, `needsReview`, and `search`**
+  - Return: `{ success: true, data: { conversations, total, page, limit, unreadTotal } }`
 
-### Task 10: Create API Route for Conversation Detail (AC: 3)
+### Task 10: Create API Routes for Conversation Detail & Read Status (AC: 3, 5)
 - [ ] Create `src/app/api/inbox/conversations/[id]/route.ts`
   - GET: Return single conversation with all messages
   - Use `getConversationWithMessages` from conversation-service
-  - PATCH: Mark as read
   - Workspace ownership check
+- [ ] Create `src/app/api/inbox/conversations/[id]/read/route.ts`
+  - POST: Mark as read (canonical endpoint for compatibility with `useMarkAsRead` from Story 6.2)
+  - Optional: keep `PATCH /api/inbox/conversations/[id]` only as backward-compatible alias
 
 ### Task 11: Update TanStack Query Hooks (AC: all)
-- [ ] Update `src/hooks/use-conversations.ts` (if needed)
-  - Ensure hooks accept filter parameters
+- [ ] Update `src/lib/inbox/conversation-service.ts`
+  - Extend `ConversationFilters` to support `classification`, `needsReview`, and `search`
+  - Implement Prisma filtering logic for AC4 combinations
+- [ ] Update `src/hooks/use-conversations.ts`
+  - Ensure hooks accept full inbox filter parameters
   - Add `useInboxConversations` with pagination support
+- [ ] Update `src/types/inbox.ts`
+  - Align `ConversationListResponse` with `{ conversations, total, page, limit, unreadTotal }`
 - [ ] Ensure `useUnreadCount` is used for badge in sidebar
 
 ### Task 12: Create Unit Tests (AC: all)
@@ -197,7 +206,7 @@ So that **I can efficiently review and respond to prospects**.
 **From Story 6.1 (Gmail Sync):**
 - `Conversation` and `InboxMessage` Prisma models already exist
 - Gmail sync creates InboxMessage records for inbound replies
-- `ReplyClassification` enum values: INTERESTED, NOT_NOW, NEGATIVE, OOO, BOUNCE, UNSUBSCRIBE
+- `ReplyClassification` enum values: INTERESTED, NOT_INTERESTED, NOT_NOW, NEGATIVE, OUT_OF_OFFICE, UNSUBSCRIBE, BOUNCE, NEEDS_REVIEW, OTHER
 
 **From Story 6.2 (Data Model):**
 - `getConversationWithMessages(conversationId)` - returns conversation with all messages
@@ -214,7 +223,8 @@ So that **I can efficiently review and respond to prospects**.
 | `src/app/(dashboard)/inbox/page.tsx` | NEW | Main inbox page |
 | `src/app/(dashboard)/inbox/loading.tsx` | NEW | Skeleton loading |
 | `src/app/api/inbox/conversations/route.ts` | NEW | List API |
-| `src/app/api/inbox/conversations/[id]/route.ts` | NEW | Detail API |
+| `src/app/api/inbox/conversations/[id]/route.ts` | NEW | Detail API (GET, optional PATCH alias) |
+| `src/app/api/inbox/conversations/[id]/read/route.ts` | NEW | Mark-as-read API (POST canonical) |
 | `src/components/features/inbox/ConversationList.tsx` | NEW | List component |
 | `src/components/features/inbox/ConversationListItem.tsx` | NEW | List item |
 | `src/components/features/inbox/ConversationDetail.tsx` | NEW | Detail panel |
@@ -233,7 +243,7 @@ So that **I can efficiently review and respond to prospects**.
 - **InboxReplyCard:** Custom component from UX spec (Priority P2)
 - **Keyboard navigation:** Up/down to browse, Enter to open, Escape to close
 - **Mark as read on view**
-- **Categories:** 4 max (Interested, Not Now, Negative, OOO) + Bounce/Unsubscribe/Needs Review
+- **Categories:** Primary buckets max 4 (Interested, Not Interested, Not Now, Negative) + system classes (Out of Office, Bounce, Unsubscribe, Needs Review, Other)
 - **1-click actions:** Quick responses for common patterns
 - **Skeleton loading:** Shimmer pattern during fetch
 - **Color palette:**
@@ -303,6 +313,19 @@ interface InboxListResponse {
     limit: number;
     unreadTotal: number;
   };
+}
+```
+
+**Required Service Filter Contract for AC4:**
+```typescript
+interface ConversationFilters {
+  status?: ConversationStatus;
+  hasUnread?: boolean;
+  classification?: ReplyClassification[];
+  needsReview?: boolean;
+  search?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 ```
 

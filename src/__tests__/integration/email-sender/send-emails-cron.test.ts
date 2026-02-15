@@ -20,6 +20,7 @@ describe('POST /api/cron/send-emails', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubEnv('CRON_SECRET', 'test-secret');
+        vi.stubEnv('NODE_ENV', 'production');
     });
 
     it('requires authorization header', async () => {
@@ -103,6 +104,7 @@ describe('GET /api/cron/send-emails', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubEnv('CRON_SECRET', 'test-secret');
+        vi.stubEnv('NODE_ENV', 'production');
     });
 
     it('works the same as POST (for Vercel Cron compatibility)', async () => {

@@ -25,7 +25,7 @@ describe('OnboardingBanner', () => {
     it('has a link to onboarding page', () => {
         render(<OnboardingBanner />);
         const link = screen.getByRole('link');
-        expect(link).toHaveAttribute('href', '/settings/onboarding');
+        expect(link).toHaveAttribute('href', '/onboarding');
     });
 
     it('can be dismissed', () => {

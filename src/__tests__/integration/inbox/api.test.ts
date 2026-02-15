@@ -58,11 +58,42 @@ describe('Inbox API Integration', () => {
     describe('GET /api/inbox/conversations', () => {
         it('should return paginated conversations', async () => {
             const mockConversations = [
-                { id: 'c-1', prospect: { email: 'p1@test.com' }, messages: [] },
-                { id: 'c-2', prospect: { email: 'p2@test.com' }, messages: [] },
+                {
+                    id: 'c-1',
+                    workspaceId: 'ws-1',
+                    threadId: 't-1',
+                    prospectId: null,
+                    campaignId: null,
+                    sequenceId: null,
+                    status: 'OPEN',
+                    lastMessageAt: new Date(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    prospect: { email: 'p1@test.com', firstName: null, lastName: null, id: 'p1', company: null },
+                    campaign: null,
+                    messages: [],
+                    _count: { messages: 0 },
+                },
+                {
+                    id: 'c-2',
+                    workspaceId: 'ws-1',
+                    threadId: 't-2',
+                    prospectId: null,
+                    campaignId: null,
+                    sequenceId: null,
+                    status: 'OPEN',
+                    lastMessageAt: new Date(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    prospect: { email: 'p2@test.com', firstName: null, lastName: null, id: 'p2', company: null },
+                    campaign: null,
+                    messages: [],
+                    _count: { messages: 0 },
+                },
             ];
             vi.mocked(prisma.conversation.findMany).mockResolvedValue(mockConversations as any);
             vi.mocked(prisma.conversation.count).mockResolvedValue(2);
+            vi.mocked(prisma.inboxMessage.count).mockResolvedValue(3);
 
             const req = createRequest('/api/inbox/conversations?page=1&limit=10');
             const res = await getConversations(req);
@@ -71,11 +102,13 @@ describe('Inbox API Integration', () => {
             expect(res.status).toBe(200);
             expect(json.data.conversations).toHaveLength(2);
             expect(json.data.total).toBe(2);
+            expect(json.data.unreadTotal).toBe(3);
         });
 
         it('should filter by unread status', async () => {
             vi.mocked(prisma.conversation.findMany).mockResolvedValue([]);
             vi.mocked(prisma.conversation.count).mockResolvedValue(0);
+            vi.mocked(prisma.inboxMessage.count).mockResolvedValue(0);
 
             const req = createRequest('/api/inbox/conversations?unread=true');
             await getConversations(req);
@@ -91,11 +124,52 @@ describe('Inbox API Integration', () => {
                 })
             }));
         });
+
+        it('should support classification and needsReview filters', async () => {
+            vi.mocked(prisma.conversation.findMany).mockResolvedValue([]);
+            vi.mocked(prisma.conversation.count).mockResolvedValue(0);
+            vi.mocked(prisma.inboxMessage.count).mockResolvedValue(0);
+
+            const req = createRequest('/api/inbox/conversations?classification=INTERESTED&needsReview=true');
+            await getConversations(req);
+
+            expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
+                where: expect.objectContaining({
+                    messages: expect.objectContaining({
+                        some: expect.objectContaining({
+                            classification: { in: ['INTERESTED'] },
+                            needsReview: true,
+                        }),
+                    }),
+                }),
+            }));
+        });
+
+        it('should return 400 for invalid classification value', async () => {
+            const req = createRequest('/api/inbox/conversations?classification=INVALID_ENUM');
+            const res = await getConversations(req);
+
+            expect(res.status).toBe(400);
+        });
     });
 
     describe('GET /api/inbox/conversations/[id]', () => {
         it('should return conversation details', async () => {
-            const mockConv = { id: 'c-1', messages: [{ id: 'm-1' }] };
+            const mockConv = {
+                id: 'c-1',
+                workspaceId: 'ws-1',
+                threadId: 't-1',
+                prospectId: null,
+                campaignId: null,
+                sequenceId: null,
+                status: 'OPEN',
+                lastMessageAt: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                messages: [{ id: 'm-1', direction: 'INBOUND', isRead: true, receivedAt: new Date() }],
+                prospect: null,
+                campaign: null,
+            };
             vi.mocked(prisma.conversation.findUnique).mockResolvedValue(mockConv as any);
 
             const req = createRequest('/api/inbox/conversations/c-1');
@@ -109,6 +183,7 @@ describe('Inbox API Integration', () => {
 
     describe('POST /api/inbox/conversations/[id]/read', () => {
         it('should mark messages as read', async () => {
+            vi.mocked(prisma.conversation.findUnique).mockResolvedValue({ workspaceId: 'ws-1' } as any);
             vi.mocked(prisma.inboxMessage.updateMany).mockResolvedValue({ count: 5 });
 
             const req = createRequest('/api/inbox/conversations/c-1/read', 'POST');
