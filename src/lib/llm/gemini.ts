@@ -11,7 +11,10 @@ import {
     EmailResult,
     LLMError,
     GENERATION_TIMEOUT_MS,
-    OpenerContext
+    OpenerContext,
+    CLASSIFICATION_TIMEOUT_MS,
+    ClassificationContext,
+    ClassificationResult,
 } from './types';
 
 // ============================================================================
@@ -112,6 +115,32 @@ RÈGLES:
 - PAS de "J'espère que vous allez bien".
 - Réponds UNIQUEMENT par le texte de l'opener.`;
 
+const CLASSIFICATION_SYSTEM_PROMPT = `Tu es un assistant spécialisé dans la classification des réponses aux emails de prospection commerciale.
+
+Classifie la réponse suivante dans UNE de ces catégories :
+- INTERESTED : Le prospect montre de l'intérêt (veut en savoir plus, propose un RDV, pose des questions)
+- NOT_NOW : Le prospect n'est pas intéressé maintenant mais pas fermé (timing, budget, reviendra plus tard)
+- NEGATIVE : Le prospect refuse clairement (pas intéressé, ne pas contacter, ton négatif)
+- OTHER : Réponse qui ne rentre dans aucune catégorie
+
+Réponds UNIQUEMENT en JSON :
+{"classification":"INTERESTED|NOT_NOW|NEGATIVE|OTHER","confidence":0-100,"reasoning":"explication brève"}
+`;
+
+const VALID_CLASSIFICATIONS = new Set(['INTERESTED', 'NOT_NOW', 'NEGATIVE', 'OTHER']);
+
+function extractJsonFromLLM(text: string): string {
+    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const candidate = jsonBlockMatch ? jsonBlockMatch[1].trim() : text;
+    const jsonMatch = candidate.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+        throw new LLMError('PROVIDER_ERROR', 'Format de réponse invalide');
+    }
+
+    return jsonMatch[0];
+}
+
 // ============================================================================
 // Vertex AI Gemini Provider
 // ============================================================================
@@ -167,22 +196,7 @@ class GeminiProvider implements LLMProvider {
                 throw new LLMError('PROVIDER_ERROR', 'La réponse du modèle est vide');
             }
 
-            // Extract JSON from response (handle markdown code blocks)
-            let jsonStr = text;
-
-            // Remove markdown code blocks if present
-            const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (jsonBlockMatch) {
-                jsonStr = jsonBlockMatch[1].trim();
-            }
-
-            // Find JSON object
-            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new LLMError('PROVIDER_ERROR', 'Format de réponse invalide');
-            }
-
-            const parsed = JSON.parse(jsonMatch[0]);
+            const parsed = JSON.parse(extractJsonFromLLM(text));
 
             if (!parsed.subject || !parsed.body) {
                 throw new LLMError('PROVIDER_ERROR', 'Réponse incomplète du modèle');
@@ -301,6 +315,101 @@ Génère l'opener maintenant :`;
             }
 
             throw new LLMError('PROVIDER_ERROR', 'Erreur de génération', error);
+        }
+    }
+
+    async classifyReply(body: string, context?: ClassificationContext): Promise<ClassificationResult> {
+        const normalizedBody = body.trim();
+        if (!normalizedBody) {
+            return {
+                classification: 'OTHER',
+                confidence: 20,
+                reasoning: 'Réponse vide ou sans contenu exploitable.',
+            };
+        }
+
+        const truncatedBody = normalizedBody.slice(0, 2000);
+        const contextLines: string[] = [];
+
+        if (context?.prospectName) contextLines.push(`Prospect: ${context.prospectName}`);
+        if (context?.campaignName) contextLines.push(`Campagne: ${context.campaignName}`);
+        if (context?.sequenceName) contextLines.push(`Séquence: ${context.sequenceName}`);
+
+        const prompt = `${CLASSIFICATION_SYSTEM_PROMPT}
+${contextLines.length > 0 ? `${contextLines.join('\n')}\n` : ''}
+Message à classifier:
+${truncatedBody}`;
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+                reject(new LLMError(
+                    'GENERATION_TIMEOUT',
+                    'La classification a pris trop de temps.'
+                ));
+            }, CLASSIFICATION_TIMEOUT_MS);
+        });
+
+        try {
+            const client = this.getClient();
+            const model = client.getGenerativeModel({
+                model: this.modelName,
+                generationConfig: {
+                    temperature: 0.1,
+                    topP: 0.95,
+                    topK: 40,
+                    maxOutputTokens: 300,
+                },
+            });
+
+            const generatePromise = model.generateContent(prompt);
+            const result = await Promise.race([generatePromise, timeoutPromise]);
+            const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+            if (!text) {
+                throw new LLMError('PROVIDER_ERROR', 'La réponse du modèle est vide');
+            }
+
+            const parsed = JSON.parse(extractJsonFromLLM(text)) as {
+                classification?: string;
+                confidence?: number;
+                reasoning?: string;
+            };
+
+            const classification = (parsed.classification || '').toUpperCase().trim();
+            const confidence = Number(parsed.confidence);
+            const reasoning = (parsed.reasoning || '').trim();
+
+            if (!VALID_CLASSIFICATIONS.has(classification)) {
+                throw new LLMError('PROVIDER_ERROR', `Classification inconnue: ${parsed.classification}`);
+            }
+
+            if (!Number.isFinite(confidence) || confidence < 0 || confidence > 100) {
+                throw new LLMError('PROVIDER_ERROR', `Confidence invalide: ${parsed.confidence}`);
+            }
+
+            return {
+                classification,
+                confidence: Math.round(confidence),
+                reasoning: reasoning || 'Classification fournie par le modèle.',
+            };
+        } catch (error) {
+            if (error instanceof LLMError) {
+                throw error;
+            }
+
+            if (error instanceof Error && error.message.includes('429')) {
+                throw new LLMError('RATE_LIMIT_EXCEEDED', 'Limite de requêtes atteinte.', error);
+            }
+
+            if (error instanceof SyntaxError) {
+                throw new LLMError('PROVIDER_ERROR', 'Réponse JSON invalide du modèle.', error);
+            }
+
+            throw new LLMError(
+                'PROVIDER_ERROR',
+                `Erreur de classification: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+                error
+            );
         }
     }
 }

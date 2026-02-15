@@ -34,6 +34,7 @@ function parseFiltersFromUrl(searchParams: URLSearchParams): ConversationFilters
         limit: Number.isNaN(limit) ? 25 : [25, 50, 100].includes(limit) ? limit : 25,
         hasUnread: searchParams.get('unread') === 'true' ? true : undefined,
         needsReview: searchParams.get('needsReview') === 'true' ? true : undefined,
+        sortByPriority: searchParams.get('sortByPriority') === 'false' ? false : true,
         search: searchParams.get('search') || undefined,
         classification: classification && classification.length > 0 ? classification : undefined,
         dateFrom: searchParams.get('dateFrom') || undefined,
@@ -67,6 +68,7 @@ export function InboxPageClient() {
         if (filters.limit && filters.limit !== 25) params.set('limit', filters.limit.toString());
         if (filters.hasUnread) params.set('unread', 'true');
         if (filters.needsReview) params.set('needsReview', 'true');
+        if (filters.sortByPriority === false) params.set('sortByPriority', 'false');
         if (filters.search?.trim()) params.set('search', filters.search.trim());
         if (filters.classification && filters.classification.length > 0) {
             params.set('classification', filters.classification.join(','));

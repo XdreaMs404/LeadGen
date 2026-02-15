@@ -16,6 +16,7 @@ export interface ConversationFilters {
     hasUnread?: boolean;
     classification?: ReplyClassification[];
     needsReview?: boolean;
+    sortByPriority?: boolean;
     search?: string;
     dateFrom?: Date;
     dateTo?: Date;
@@ -113,7 +114,7 @@ export async function getConversationsForProspect(prospectId: string) {
  * Used by unified inbox UI (AC3)
  * 
  * @param workspaceId - The workspace ID
- * @param filters - Optional filters (status, unread, classification, needsReview, search, date range)
+ * @param filters - Optional filters (status, unread, classification, needsReview, sortByPriority, search, date range)
  * @param pagination - Pagination options
  * @returns Paginated list of conversations with prospect/campaign info
  */
@@ -185,8 +186,7 @@ export async function getConversationsForWorkspace(
     // Get total count
     const total = await prisma.conversation.count({ where });
 
-    // Get conversations with related data
-    const conversations = await prisma.conversation.findMany({
+    const baseQuery = {
         where,
         include: {
             prospect: {
@@ -220,9 +220,34 @@ export async function getConversationsForWorkspace(
             },
         },
         orderBy: { lastMessageAt: 'desc' },
-        skip: pagination?.skip ?? 0,
-        take: pagination?.take ?? 25,
+    } as const;
+
+    let conversations = await prisma.conversation.findMany({
+        ...baseQuery,
+        ...(filters?.sortByPriority
+            ? {}
+            : {
+                skip: pagination?.skip ?? 0,
+                take: pagination?.take ?? 25,
+            }),
     });
+
+    if (filters?.sortByPriority) {
+        conversations = conversations.sort((a, b) => {
+            const aInterested = a.messages[0]?.classification === 'INTERESTED' ? 1 : 0;
+            const bInterested = b.messages[0]?.classification === 'INTERESTED' ? 1 : 0;
+
+            if (aInterested !== bInterested) {
+                return bInterested - aInterested;
+            }
+
+            return b.lastMessageAt.getTime() - a.lastMessageAt.getTime();
+        });
+
+        const skip = pagination?.skip ?? 0;
+        const take = pagination?.take ?? 25;
+        conversations = conversations.slice(skip, skip + take);
+    }
 
     return {
         conversations,

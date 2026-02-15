@@ -44,6 +44,7 @@ export interface ConversationFilters {
     hasUnread?: boolean;
     classification?: ReplyClassification[];
     needsReview?: boolean;
+    sortByPriority?: boolean;
     search?: string;
     dateFrom?: string | Date;
     dateTo?: string | Date;
@@ -71,6 +72,7 @@ export function useConversations(filters?: ConversationFilters) {
             if (filters?.status) params.set('status', filters.status);
             if (filters?.hasUnread) params.set('unread', 'true');
             if (filters?.needsReview) params.set('needsReview', 'true');
+            if (filters?.sortByPriority === false) params.set('sortByPriority', 'false');
             if (filters?.classification && filters.classification.length > 0) {
                 params.set('classification', filters.classification.join(','));
             }

@@ -84,7 +84,7 @@ export function ClassificationBadge({
     const config = classificationConfig[classification];
 
     // Show low confidence indicator if score is below 70%
-    const showLowConfidence = showConfidence && confidenceScore !== undefined && confidenceScore < 0.7;
+    const showLowConfidence = showConfidence && confidenceScore !== undefined && confidenceScore < 70;
 
     return (
         <span
@@ -98,7 +98,7 @@ export function ClassificationBadge({
             {showLowConfidence && (
                 <span
                     className="text-[0.6rem] opacity-60"
-                    title={`Confiance: ${Math.round(confidenceScore * 100)}%`}
+                    title={`Confiance: ${Math.round(confidenceScore)}%`}
                 >
                     ?
                 </span>

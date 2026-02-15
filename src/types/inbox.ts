@@ -1,4 +1,9 @@
-import type { ConversationStatus, MessageDirection, ReplyClassification } from '@prisma/client';
+import type {
+    ConversationStatus,
+    MessageDirection,
+    ReplyClassification,
+    ClassificationMethod,
+} from '@prisma/client';
 
 // ============================================
 // Conversation Types
@@ -86,8 +91,30 @@ export interface InboxMessage {
     toEmail: string;
     receivedAt: string;
     classification: ReplyClassification | null;
+    confidenceScore: number | null;
+    classificationMethod: ClassificationMethod | null;
+    needsReview: boolean;
     isRead: boolean;
     createdAt: string;
+}
+
+// ============================================
+// Classification Types (Story 6.4)
+// ============================================
+
+export interface ClassificationContext {
+    prospectName?: string;
+    campaignName?: string;
+    sequenceName?: string;
+}
+
+export interface ClassificationResult {
+    classification: ReplyClassification | null;
+    confidenceScore: number | null;
+    classificationMethod: ClassificationMethod | null;
+    needsReview: boolean;
+    reasoning?: string;
+    error?: string;
 }
 
 // ============================================
@@ -164,4 +191,4 @@ export interface InboxMessageListResponse {
 }
 
 // Re-export enums for convenience
-export { ConversationStatus, MessageDirection, ReplyClassification };
+export { ConversationStatus, MessageDirection, ReplyClassification, ClassificationMethod };

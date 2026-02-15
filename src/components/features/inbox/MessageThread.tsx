@@ -103,6 +103,7 @@ export function MessageThread({ messages }: MessageThreadProps) {
                                 {isInbound && message.classification && (
                                     <ClassificationBadge
                                         classification={message.classification}
+                                        confidenceScore={message.confidenceScore ?? undefined}
                                         size="sm"
                                     />
                                 )}

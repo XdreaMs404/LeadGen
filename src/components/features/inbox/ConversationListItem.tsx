@@ -85,7 +85,11 @@ export function ConversationListItem({ conversation, isSelected, onSelect }: Con
                 </div>
 
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <ClassificationBadge classification={lastMessage?.classification ?? null} size="sm" />
+                    <ClassificationBadge
+                        classification={lastMessage?.classification ?? null}
+                        confidenceScore={lastMessage?.confidenceScore ?? undefined}
+                        size="sm"
+                    />
                     {hasUnread && (
                         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-500 text-white text-xs font-medium">
                             {unreadCount}

@@ -341,6 +341,9 @@ export function mapInboxMessage(prismaMessage: PrismaInboxMessage): InboxMessage
         toEmail: prismaMessage.toEmail,
         receivedAt: prismaMessage.receivedAt.toISOString(),
         classification: prismaMessage.classification,
+        confidenceScore: prismaMessage.confidenceScore,
+        classificationMethod: prismaMessage.classificationMethod,
+        needsReview: prismaMessage.needsReview,
         isRead: prismaMessage.isRead,
         createdAt: prismaMessage.createdAt.toISOString(),
     };

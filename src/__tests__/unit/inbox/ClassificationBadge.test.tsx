@@ -15,11 +15,11 @@ describe('ClassificationBadge', () => {
 
     it('shows low confidence indicator only below 70%', () => {
         const { rerender } = render(
-            <ClassificationBadge classification="INTERESTED" confidenceScore={0.69} />
+            <ClassificationBadge classification="INTERESTED" confidenceScore={69} />
         );
         expect(screen.getByTitle('Confiance: 69%')).toBeInTheDocument();
 
-        rerender(<ClassificationBadge classification="INTERESTED" confidenceScore={0.7} />);
+        rerender(<ClassificationBadge classification="INTERESTED" confidenceScore={70} />);
         expect(screen.queryByTitle('Confiance: 70%')).not.toBeInTheDocument();
     });
 });

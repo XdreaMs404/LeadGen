@@ -23,6 +23,54 @@ import {
 import { extractEmailAddress } from '@/lib/utils/email-body-parser';
 import type { SyncResult, WorkspaceSyncResult, GmailMessageDetails } from '@/types/inbox';
 import { GmailSendError } from '@/lib/gmail/sender';
+import { applyClassification, classifyMessage } from './classification/classification-service';
+import { handleClassificationActions } from './classification/auto-actions';
+
+const CLASSIFICATION_RETRY_BATCH_SIZE = 25;
+
+async function retryPendingClassifications(workspaceId: string): Promise<number> {
+    const pendingMessages = await prisma.inboxMessage.findMany({
+        where: {
+            direction: 'INBOUND',
+            classification: null,
+            needsReview: true,
+            conversation: {
+                workspaceId,
+            },
+        },
+        select: {
+            id: true,
+            direction: true,
+            subject: true,
+            bodyRaw: true,
+            bodyCleaned: true,
+            conversationId: true,
+        },
+        take: CLASSIFICATION_RETRY_BATCH_SIZE,
+        orderBy: {
+            receivedAt: 'asc',
+        },
+    });
+
+    let retried = 0;
+
+    for (const pendingMessage of pendingMessages) {
+        const classificationResult = await classifyMessage(pendingMessage);
+        await applyClassification(pendingMessage.id, classificationResult);
+
+        if (classificationResult.classification && !classificationResult.needsReview) {
+            await handleClassificationActions(
+                { id: pendingMessage.id },
+                classificationResult.classification,
+                pendingMessage.conversationId
+            );
+        }
+
+        retried++;
+    }
+
+    return retried;
+}
 
 /**
  * Process a single incoming message
@@ -84,7 +132,7 @@ async function processIncomingMessage(
         });
 
         // Create inbox message
-        await createInboxMessage({
+        const inboxMessage = await createInboxMessage({
             conversationId: conversation.id,
             gmailMessageId: message.id,
             direction,
@@ -96,12 +144,42 @@ async function processIncomingMessage(
             receivedAt,
         });
 
-        // If this is an inbound reply and we matched to a campaign, update prospect status
-        if (isInbound && sentEmail && campaignId && prospectId) {
-            const campaignProspect = await findCampaignProspect(prospectId, campaignId);
-            if (campaignProspect && campaignProspect.enrollmentStatus === 'ENROLLED') {
-                await markProspectAsReplied(campaignProspect.id);
-                console.log(`[inbox-sync] Marked prospect ${prospectId} as REPLIED in campaign ${campaignId}`);
+        if (isInbound) {
+            try {
+                const classificationResult = await classifyMessage(inboxMessage);
+                await applyClassification(inboxMessage.id, classificationResult);
+
+                console.log(
+                    `[inbox-sync] Classification ${inboxMessage.id}: ${classificationResult.classification ?? 'NULL'} (confidence=${classificationResult.confidenceScore ?? 'n/a'}, needsReview=${classificationResult.needsReview})`
+                );
+
+                if (!classificationResult.needsReview) {
+                    // Keep legacy "reply means replied" behavior while avoiding conflict with hard-stop classes.
+                    if (
+                        sentEmail &&
+                        campaignId &&
+                        prospectId &&
+                        classificationResult.classification !== 'UNSUBSCRIBE' &&
+                        classificationResult.classification !== 'BOUNCE'
+                    ) {
+                        const campaignProspect = await findCampaignProspect(prospectId, campaignId);
+                        if (campaignProspect && campaignProspect.enrollmentStatus === 'ENROLLED') {
+                            await markProspectAsReplied(campaignProspect.id);
+                            console.log(`[inbox-sync] Marked prospect ${prospectId} as REPLIED in campaign ${campaignId}`);
+                        }
+                    }
+
+                    if (classificationResult.classification) {
+                        await handleClassificationActions(
+                            { id: inboxMessage.id },
+                            classificationResult.classification,
+                            conversation.id
+                        );
+                    }
+                }
+            } catch (classificationError) {
+                const errorMessage = classificationError instanceof Error ? classificationError.message : String(classificationError);
+                console.error(`[inbox-sync] Classification pipeline error for message ${message.id}:`, errorMessage);
             }
         }
 
@@ -180,6 +258,17 @@ export async function syncWorkspaceInbox(
 
         // Small delay between messages to respect rate limits
         await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    // Retry messages left unclassified by previous LLM failures.
+    try {
+        const retried = await retryPendingClassifications(workspaceId);
+        if (retried > 0) {
+            console.log(`[inbox-sync] Retried classification for ${retried} pending message(s)`);
+        }
+    } catch (retryError) {
+        const retryErrorMessage = retryError instanceof Error ? retryError.message : String(retryError);
+        console.error(`[inbox-sync] Failed to retry pending classifications for workspace ${workspaceId}:`, retryErrorMessage);
     }
 
     // Update last synced timestamp

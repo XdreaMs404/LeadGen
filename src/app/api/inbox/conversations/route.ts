@@ -8,6 +8,7 @@
  * - classification: Filter by classification (comma-separated)
  * - unread: Filter by unread (true/false)
  * - needsReview: Filter by needs review (true/false)
+ * - sortByPriority: Prioritize INTERESTED conversations first (true/false, default true)
  * - search: Search by prospect name/email
  * - dateFrom: Filter by date from
  * - dateTo: Filter by date to
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
         const classificationParam = searchParams.get('classification');
         const unread = searchParams.get('unread') === 'true';
         const needsReview = searchParams.get('needsReview') === 'true';
+        const sortByPriority = searchParams.get('sortByPriority') !== 'false';
         const statusParam = searchParams.get('status');
         const search = searchParams.get('search')?.trim();
         const dateFromParam = searchParams.get('dateFrom');
@@ -105,6 +107,7 @@ export async function GET(request: NextRequest) {
                 hasUnread: unread,
                 classification: classifications,
                 needsReview,
+                sortByPriority,
                 search,
                 dateFrom,
                 dateTo,

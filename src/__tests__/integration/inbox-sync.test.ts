@@ -22,6 +22,8 @@ const { mockPrisma } = vi.hoisted(() => ({
         },
         inboxMessage: {
             upsert: vi.fn(),
+            update: vi.fn(),
+            findMany: vi.fn().mockResolvedValue([]),
         },
         campaignProspect: {
             findUnique: vi.fn(),
@@ -53,6 +55,20 @@ vi.mock('@/lib/gmail/inbox-sync', () => ({
     isInboundMessage: vi.fn(() => true),
     isAuthError: vi.fn((code) => code === 401),
     extractEmailAddress: vi.fn((email) => email),
+}));
+
+vi.mock('@/lib/inbox/classification/classification-service', () => ({
+    classifyMessage: vi.fn().mockResolvedValue({
+        classification: 'OTHER',
+        confidenceScore: 85,
+        classificationMethod: 'LLM',
+        needsReview: false,
+    }),
+    applyClassification: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/inbox/classification/auto-actions', () => ({
+    handleClassificationActions: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('Inbox Sync Integration', () => {

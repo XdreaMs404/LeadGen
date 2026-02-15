@@ -108,7 +108,7 @@ development_status:
   6-1-gmail-reply-sync-cron-polling-mvp: done
   6-2-conversation-data-model: done
   6-3-unified-inbox-ui: review
-  6-4-ai-reply-classification-with-confidence: ready-for-dev
+  6-4-ai-reply-classification-with-confidence: review
   6-5-manual-reply-reclassification: backlog
   6-6-reply-suggestions-with-booking-link: backlog
   6-7-send-reply-from-inbox-with-threading: backlog

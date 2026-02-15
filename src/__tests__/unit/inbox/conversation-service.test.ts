@@ -290,6 +290,48 @@ describe('Conversation Service', () => {
                 },
             });
         });
+
+        it('should prioritize INTERESTED conversations when sortByPriority=true', async () => {
+            vi.mocked(prisma.conversation.count).mockResolvedValue(2);
+            vi.mocked(prisma.conversation.findMany).mockResolvedValue([
+                {
+                    id: 'conv-low',
+                    threadId: 'thread-low',
+                    workspaceId: 'ws-1',
+                    prospectId: 'p-low',
+                    campaignId: null,
+                    sequenceId: null,
+                    status: 'OPEN' as const,
+                    lastMessageAt: new Date('2026-02-10T10:00:00Z'),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    messages: [{ classification: 'OTHER' }],
+                    _count: { messages: 0 },
+                },
+                {
+                    id: 'conv-int',
+                    threadId: 'thread-int',
+                    workspaceId: 'ws-1',
+                    prospectId: 'p-int',
+                    campaignId: null,
+                    sequenceId: null,
+                    status: 'OPEN' as const,
+                    lastMessageAt: new Date('2026-02-10T09:00:00Z'),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    messages: [{ classification: 'INTERESTED' }],
+                    _count: { messages: 0 },
+                },
+            ] as any);
+
+            const result = await getConversationsForWorkspace(
+                'ws-1',
+                { sortByPriority: true },
+                { skip: 0, take: 25 }
+            );
+
+            expect(result.conversations[0].id).toBe('conv-int');
+        });
     });
 
     describe('markConversationAsRead', () => {
